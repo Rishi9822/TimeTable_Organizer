@@ -5,7 +5,11 @@ import DraggableSubject from './DraggableSubjects';
 import { DAYS_SHORT, DEFAULT_PERIODS } from '@/lib/timetable-types';
 import { detectConflicts, getSlotStatus } from '@/lib/conflict-detection';
 import { useTimetableContext } from '@/contexts/TimetableContext';
-import { useClassAssignments, useTeachers, useSubjects } from '@/hooks/useTeachers';
+import {
+    useTeacherClassAssignments,
+    useTeachers,
+    useSubjects
+} from '@/hooks/useTeachers';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
@@ -29,7 +33,9 @@ const TimetableGrid = ({ classId, className: classSectionName }) => {
 
 
     // Fetch data from database
-    const { data: classAssignments = [], isLoading: isLoadingAssignments } = useClassAssignments(classId);
+    const { data: teacherClassAssignments = [], isLoading: isLoadingAssignments } =
+        useTeacherClassAssignments();
+
     const { data: allTeachers = [] } = useTeachers();
     const { data: allSubjects = [] } = useSubjects();
 
@@ -57,6 +63,15 @@ const TimetableGrid = ({ classId, className: classSectionName }) => {
             });
         });
     }, []);
+
+    const classTeacherAssignments = useMemo(() => {
+        return teacherClassAssignments.filter(
+            (a) => a.class_id === classId
+        );
+    }, [teacherClassAssignments, classId]);
+
+
+
 
     // Calculate entries for conflict detection
     const entries = useMemo(() => {
@@ -229,21 +244,24 @@ const TimetableGrid = ({ classId, className: classSectionName }) => {
 
     // Build teacher-subject pairs for the sidebar from database
     const teacherSubjectPairs = useMemo(() => {
-        return classAssignments.map((assignment) => {
-            const teacher = assignment.teachers;
-            const subject = assignment.subjects;
+        return classTeacherAssignments.map((assignment) => {
+            const teacher = getTeacherById(assignment.teacher_id);
+            const subject = getSubjectById(assignment.subject_id);
+
             return {
                 id: assignment.id,
                 teacherId: assignment.teacher_id,
                 subjectId: assignment.subject_id,
-                teacherName: teacher?.name || 'Unknown Teacher',
-                subjectName: subject?.name || 'Unknown Subject',
-                subjectShortName: subject?.code || subject?.name?.slice(0, 4) || 'N/A',
-                color: subject?.color || generateTeacherColor(teacher?.name || 'default'),
+                teacherName: teacher?.name || "Unknown Teacher",
+                subjectName: subject?.name || "Unknown Subject",
+                subjectShortName:
+                    subject?.code || subject?.name?.slice(0, 4) || "N/A",
+                color: subject?.color || generateTeacherColor(teacher?.name || ""),
                 periodsRequired: subject?.periods_per_week || 4,
             };
         });
-    }, [classAssignments]);
+    }, [classTeacherAssignments, allTeachers, allSubjects]);
+
 
     if (isLoadingAssignments) {
         return (
@@ -363,7 +381,7 @@ const TimetableGrid = ({ classId, className: classSectionName }) => {
 
                             {/* Period rows */}
                             {periods.map((period, periodIndex) => (
-  <div key={`row-${periodIndex}`} className="contents">
+                                <div key={`row-${periodIndex}`} className="contents">
 
                                     {/* Time column */}
                                     <div

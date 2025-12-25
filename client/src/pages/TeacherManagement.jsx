@@ -201,15 +201,15 @@ const TeacherManagement = () => {
   };
 
   const teacherSubjectMap = useMemo(() => {
-  const map = new Map();
-  localTeacherSubjects.forEach(ts => {
-    if (!map.has(ts.teacherId)) {
-      map.set(ts.teacherId, []);
-    }
-    map.get(ts.teacherId).push(ts.subjectId);
-  });
-  return map;
-}, [localTeacherSubjects]);
+    const map = new Map();
+    localTeacherSubjects.forEach(ts => {
+      if (!map.has(ts.teacherId)) {
+        map.set(ts.teacherId, []);
+      }
+      map.get(ts.teacherId).push(ts.subjectId);
+    });
+    return map;
+  }, [localTeacherSubjects]);
 
 
   const getTeacherSubjectIds = (teacherId) =>
@@ -473,12 +473,12 @@ const TeacherManagement = () => {
                                     return (
                                       <div key={subject.id} className="flex items-center gap-3">
                                         <Checkbox
-  disabled={assignTeacherSubject.isPending || removeTeacherSubject.isPending}
-  checked={getTeacherSubjectIds(teacher.id).includes(subject.id)}
-  onCheckedChange={(checked) =>
-    handleToggleSubject(teacher.id, subject.id, checked)
-  }
-/>
+                                          disabled={assignTeacherSubject.isPending || removeTeacherSubject.isPending}
+                                          checked={getTeacherSubjectIds(teacher.id).includes(subject.id)}
+                                          onCheckedChange={(checked) =>
+                                            handleToggleSubject(teacher.id, subject.id, checked)
+                                          }
+                                        />
 
 
                                         <div
