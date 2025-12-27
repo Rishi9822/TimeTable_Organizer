@@ -117,27 +117,25 @@ export const useDeleteSubject = () => {
   });
 };
 
-/* =========================
-   INSTITUTION SETTINGS
-   (Supabase UPSERT → Mongo POST)
-========================= */
 
-export const useInstitutionSettings = () => {
+export const useInstitutionSettings = ({ enabled } = {}) => {
   return useQuery({
     queryKey: ["institution_settings"],
+    enabled,
     queryFn: async () => {
-      const res = await api.get("/institution-settings");
+      const res = await api.get("/institutions/settings");
       return res.data;
     },
   });
 };
+
 
 export const useUpsertInstitutionSettings = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (settings) => {
-      const res = await api.post("/institution-settings", settings);
+      const res = await api.post("/institutions/settings", settings);
       return res.data;
     },
     onSuccess: () => {
@@ -147,6 +145,7 @@ export const useUpsertInstitutionSettings = () => {
     },
   });
 };
+
 
 export function useClassAssignments(classId) {
   return useQuery({

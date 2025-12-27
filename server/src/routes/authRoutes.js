@@ -1,12 +1,10 @@
 import express from "express";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
+import Institution from "../models/Institution.js";
 
 const router = express.Router();
 
-/* ======================
-   AUTH MIDDLEWARE
-====================== */
 const authMiddleware = async (req, res, next) => {
   const authHeader = req.headers.authorization;
 
@@ -31,85 +29,139 @@ const authMiddleware = async (req, res, next) => {
   }
 };
 
-/* ======================
-   REGISTER
-====================== */
 router.post("/register", async (req, res) => {
-  const { name, email, password, role = "student" } = req.body;
+  try {
+    const { name, email, password, role } = req.body;
 
-  if (!name || !email || !password) {
-    return res.status(400).json({ message: "Missing fields" });
+    const allowedRoles = ["admin", "scheduler", "teacher", "student"];
+    const safeRole = allowedRoles.includes(role) ? role : "student";
+
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: "Missing fields" });
+    }
+
+    const exists = await User.findOne({ email });
+    if (exists) {
+      return res.status(400).json({ message: "User already exists" });
+    }
+
+    const user = await User.create({
+      name,
+      email,
+      password,
+      role: safeRole,
+    });
+
+    const token = jwt.sign(
+      { id: user._id },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    // Fetch user with institution data
+    const userWithInstitution = await User.findById(user._id).select("-password");
+    let isSetupComplete = false;
+    
+    if (userWithInstitution.institutionId) {
+      const institution = await Institution.findById(userWithInstitution.institutionId);
+      isSetupComplete = Boolean(institution?.isSetupComplete);
+    }
+
+    res.status(201).json({
+      token,
+      user: {
+        id: userWithInstitution._id,
+        name: userWithInstitution.name,
+        email: userWithInstitution.email,
+        role: userWithInstitution.role,
+        institutionId: userWithInstitution.institutionId || null,
+        isSetupComplete,
+      },
+    });
+  } catch (error) {
+    console.error("Register error:", error);
+    res.status(500).json({ message: "Failed to create account" });
   }
-
-  const exists = await User.findOne({ email });
-  if (exists) {
-    return res.status(400).json({ message: "User already exists" });
-  }
-
-  const user = await User.create({
-    name,
-    email,
-    password,
-    role,
-  });
-
-  const token = jwt.sign(
-    { id: user._id },
-    process.env.JWT_SECRET,
-    { expiresIn: "7d" }
-  );
-
-  res.status(201).json({
-    token,
-    user: {
-      id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-    },
-  });
 });
 
-
-/* ======================
-   LOGIN
-====================== */
 router.post("/login", async (req, res) => {
-  const { email, password } = req.body;
+  try {
+    const { email, password } = req.body;
 
-  const user = await User.findOne({ email });
-  if (!user) {
-    return res.status(401).json({ message: "Invalid credentials" });
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password are required" });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
+
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
+
+    const token = jwt.sign(
+      { id: user._id },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    // Fetch institution data if user has one
+    let isSetupComplete = false;
+    if (user.institutionId) {
+      const institution = await Institution.findById(user.institutionId);
+      isSetupComplete = Boolean(institution?.isSetupComplete);
+    }
+
+    res.json({
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        institutionId: user.institutionId || null,
+        isSetupComplete,
+      },
+    });
+  } catch (error) {
+    console.error("Login error:", error);
+    res.status(500).json({ message: "Failed to login" });
+  }
+});
+
+router.get("/me", authMiddleware, async (req, res) => {
+  const user = req.user;
+
+  let institution = null;
+  let isSetupComplete = false;
+
+  if (user.institutionId) {
+    institution = await Institution.findById(user.institutionId);
+    isSetupComplete = Boolean(institution?.isSetupComplete);
   }
 
-  const isMatch = await user.comparePassword(password);
-  if (!isMatch) {
-    return res.status(401).json({ message: "Invalid credentials" });
-  }
-
-  const token = jwt.sign(
-    { id: user._id },
-    process.env.JWT_SECRET,
-    { expiresIn: "7d" }
-  );
+  console.log("AUTH /me DEBUG", {
+    userId: user._id,
+    institutionId: user.institutionId,
+    institutionExists: !!institution,
+    institutionSetupFlag: institution?.isSetupComplete,
+  });
 
   res.json({
-    token,
     user: {
       id: user._id,
       name: user.name,
       email: user.email,
       role: user.role,
+      institutionId: user.institutionId || null,
+      isSetupComplete,
     },
   });
 });
 
-/* ======================
-   CURRENT USER
-====================== */
-router.get("/me", authMiddleware, (req, res) => {
-  res.json({ user: req.user });
-});
 
 
 export default router;

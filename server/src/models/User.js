@@ -21,6 +21,18 @@ const userSchema = new mongoose.Schema(
       enum: ["admin", "scheduler", "teacher", "student"],
       default: "student",
     },
+
+    institutionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Institution",
+      default: null,
+    },
+
+    // isSetupComplete: {
+    //   type: Boolean,
+    //   default: false,
+    // },
+
   },
   { timestamps: true }
 );

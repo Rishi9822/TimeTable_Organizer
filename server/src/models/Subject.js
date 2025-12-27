@@ -2,6 +2,12 @@ import mongoose from "mongoose";
 
 const subjectSchema = new mongoose.Schema(
   {
+    institutionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Institution",
+      required: true,
+      index: true,
+    },
     name: { type: String, required: true },
     code: { type: String, default: null },
     color: { type: String, required: true },

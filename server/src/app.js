@@ -7,6 +7,9 @@ import classRoutes from "./routes/class.routes.js";
 import assignmentRoutes from "./routes/assignment.routes.js";
 import institutionRoutes from "./routes/institution.routes.js";
 import authRoutes from "./routes/authRoutes.js";
+import institutionSettingsRoutes from "./routes/institutionSettings.routes.js";
+import inviteCodeRoutes from "./routes/inviteCode.routes.js";
+
 
 
 
@@ -24,8 +27,9 @@ app.use("/api/teachers", teacherRoutes);
 app.use("/api/subjects", subjectRoutes);
 app.use("/api/classes", classRoutes);
 app.use("/api", assignmentRoutes);
-app.use("/api/institution-settings", institutionRoutes);
+app.use("/api/institutions", institutionRoutes, inviteCodeRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/institution-settings", institutionSettingsRoutes);
 
 
 app.get("/api/health", (req, res) => {

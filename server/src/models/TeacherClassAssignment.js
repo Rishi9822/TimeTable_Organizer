@@ -1,6 +1,12 @@
 import mongoose from "mongoose";
 
 const schema = new mongoose.Schema({
+  institutionId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Institution",
+    required: true,
+    index: true,
+  },
   teacher_id: { type: mongoose.Schema.Types.ObjectId, ref: "Teacher", required: true },
   subject_id: { type: mongoose.Schema.Types.ObjectId, ref: "Subject", required: true },
   class_id: { type: mongoose.Schema.Types.ObjectId, ref: "Class", required: true },
