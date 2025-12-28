@@ -63,7 +63,16 @@ export const useDeleteTeacher = () => {
       await api.delete(`/teachers/${id}`);
     },
     onSuccess: () => {
+      // CRITICAL: Invalidate all affected queries after teacher deletion
+      // Backend cascade deletion removes teacher from:
+      // - TeacherSubject mappings
+      // - TeacherClassAssignment mappings
+      // - Timetable period assignments
       queryClient.invalidateQueries({ queryKey: ["teachers"] });
+      queryClient.invalidateQueries({ queryKey: ["teacher-subjects"] });
+      queryClient.invalidateQueries({ queryKey: ["teacher-class-assignments"] });
+      // Invalidate timetables so timetable builder refetches and removes deleted teacher references
+      queryClient.invalidateQueries({ queryKey: ["timetables"] });
     },
   });
 };

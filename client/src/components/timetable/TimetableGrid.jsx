@@ -341,18 +341,27 @@ const TimetableGrid = forwardRef(({ classId, className: classSectionName, onChan
             const teacher = getTeacherById(assignment.teacher_id);
             const subject = getSubjectById(assignment.subject_id);
 
+            // DATA INTEGRITY GUARD: Skip assignments with invalid teacher or subject IDs
+            // This prevents "Unknown Teacher" from appearing when a teacher is deleted
+            if (!teacher || !subject) {
+                console.warn(
+                    `Skipping assignment with invalid IDs: teacherId=${assignment.teacher_id}, subjectId=${assignment.subject_id}`
+                );
+                return null;
+            }
+
             return {
                 id: assignment.id,
                 teacherId: assignment.teacher_id,
                 subjectId: assignment.subject_id,
-                teacherName: teacher?.name || "Unknown Teacher",
-                subjectName: subject?.name || "Unknown Subject",
-                subjectShortName:
-                    subject?.code || subject?.name?.slice(0, 4) || "N/A",
-                color: subject?.color || generateTeacherColor(teacher?.name || ""),
-                periodsRequired: subject?.periods_per_week || 4,
+                teacherName: teacher.name,
+                subjectName: subject.name,
+                subjectShortName: subject.code || subject.name.slice(0, 4) || "N/A",
+                color: subject.color || generateTeacherColor(teacher.name),
+                periodsRequired: subject.periods_per_week || 4,
             };
-        });
+        })
+        .filter(Boolean); // Remove null entries from invalid assignments
     }, [classTeacherAssignments, allTeachers, allSubjects]);
 
 

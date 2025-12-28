@@ -24,6 +24,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -109,6 +119,8 @@ const TeacherManagement = () => {
   const [classDialogOpen, setClassDialogOpen] = useState(false);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [teacherToDelete, setTeacherToDelete] = useState(null);
 
   // Handlers
   const handleAddTeacher = async () => {
@@ -400,7 +412,10 @@ const TeacherManagement = () => {
                               variant="ghost"
                               size="icon"
                               className="opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
-                              onClick={() => deleteTeacher.mutate(teacher.id)}
+                              onClick={() => {
+                                setTeacherToDelete(teacher);
+                                setDeleteConfirmOpen(true);
+                              }}
                             >
                               <Trash2 className="w-4 h-4" />
                             </Button>
@@ -832,6 +847,67 @@ const TeacherManagement = () => {
           </TabsContent>
         </Tabs>
       </main>
+
+      {/* Delete Teacher Confirmation Dialog */}
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Teacher</AlertDialogTitle>
+            <AlertDialogDescription>
+              {teacherToDelete && (
+                <>
+                  Are you sure you want to delete <strong>{teacherToDelete.name}</strong>?
+                  <br />
+                  <br />
+                  This will permanently remove:
+                  <ul className="list-disc list-inside mt-2 space-y-1 text-sm">
+                    <li>The teacher record</li>
+                    <li>All subject assignments for this teacher</li>
+                    <li>All class assignments for this teacher</li>
+                    <li>All timetable period assignments for this teacher</li>
+                  </ul>
+                  <br />
+                  <span className="text-destructive font-medium">
+                    This action cannot be undone.
+                  </span>
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setDeleteConfirmOpen(false);
+              setTeacherToDelete(null);
+            }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (teacherToDelete) {
+                  try {
+                    await deleteTeacher.mutateAsync(teacherToDelete.id);
+                    toast({
+                      title: 'Success',
+                      description: `${teacherToDelete.name} has been deleted successfully`,
+                    });
+                    setDeleteConfirmOpen(false);
+                    setTeacherToDelete(null);
+                  } catch (error) {
+                    toast({
+                      title: 'Error',
+                      description: error.response?.data?.message || error.message || 'Failed to delete teacher',
+                      variant: 'destructive',
+                    });
+                  }
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
