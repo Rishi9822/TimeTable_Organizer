@@ -2,6 +2,12 @@ import mongoose from "mongoose";
 
 const assignmentSchema = new mongoose.Schema(
   {
+    institutionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Institution",
+      required: true,
+      index: true,
+    },
     classId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Class",

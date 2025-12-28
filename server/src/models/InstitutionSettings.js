@@ -2,6 +2,13 @@ import mongoose from "mongoose";
 
 const schema = new mongoose.Schema(
   {
+    institutionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Institution",
+      required: true,
+      unique: true,
+    },
+
     institution_name: String,
     institution_type: { type: String, enum: ["school", "college"] },
     working_days: [String],
@@ -14,6 +21,7 @@ const schema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
 
 schema.method("toJSON", function () {
   const { _id, __v, ...obj } = this.toObject();

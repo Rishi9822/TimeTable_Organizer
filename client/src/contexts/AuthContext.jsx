@@ -21,60 +21,83 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(null);
+  const [institutionId, setInstitutionId] = useState(null);
+  const [isSetupComplete, setIsSetupComplete] = useState(false);
   const [loading, setLoading] = useState(true);
+
 
   // 🔁 Restore session on refresh
   useEffect(() => {
-  const loadSession = async () => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      setLoading(false);
-      return;
-    }
+    const loadSession = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        setLoading(false);
+        return;
+      }
 
-    try {
-      const { data } = await API.get("/auth/me");
-      setUser(data.user);
-      setRole(data.user.role);
-    } catch {
-      localStorage.removeItem("token");
-      setUser(null);
-      setRole(null);
-    } finally {
-      setLoading(false);
-    }
-  };
+      try {
+        const { data } = await API.get("/auth/me");
+        setUser(data.user);
+        setRole(data.user.role);
+        setInstitutionId(data.user.institutionId || null);
+setIsSetupComplete(Boolean(data.user.isSetupComplete));
+      } catch {
+        localStorage.removeItem("token");
+        setUser(null);
+        setRole(null);
+        setInstitutionId(null);
+        setIsSetupComplete(false);
 
-  loadSession();
-}, []);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadSession();
+  }, []);
 
 
   const signUp = async (email, password, name, role = "student") => {
-    const res = await API.post("/auth/register", {
-      name,
-      email,
-      password,
-      role,
-    });
+    try {
+      const res = await API.post("/auth/register", {
+        name,
+        email,
+        password,
+        role,
+      });
 
-    localStorage.setItem("token", res.data.token);
+      localStorage.setItem("token", res.data.token);
 
-    setUser(res.data.user);
-    setRole(res.data.user.role);
+      setUser(res.data.user);
+      setRole(res.data.user.role);
+      setInstitutionId(res.data.user.institutionId || null);
+      setIsSetupComplete(!!res.data.user.isSetupComplete);
 
-    return { error: null };
+      return { error: null };
+    } catch (error) {
+      const message =
+        error.response?.data?.message || "Failed to create account";
+      return { error: { message } };
+    }
   };
 
-
   const signIn = async (email, password) => {
-    const res = await API.post("/auth/login", { email, password });
+    try {
+      const res = await API.post("/auth/login", { email, password });
 
-    localStorage.setItem("token", res.data.token);
+      localStorage.setItem("token", res.data.token);
 
-    setUser(res.data.user);
-    setRole(res.data.user.role);
+      setUser(res.data.user);
+      setRole(res.data.user.role);
+      setInstitutionId(res.data.user.institutionId || null);
+      setIsSetupComplete(!!res.data.user.isSetupComplete);
 
-    return { error: null };
+      return { error: null };
+    } catch (error) {
+      const message =
+        error.response?.data?.message || "Invalid email or password";
+      return { error: { message } };
+    }
   };
 
 
@@ -82,7 +105,24 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem("token");
     setUser(null);
     setRole(null);
+    setInstitutionId(null);
+    setIsSetupComplete(false);
+
   };
+
+
+  const refreshUserData = async () => {
+  try {
+    const { data } = await API.get("/auth/me");
+    setUser(data.user);
+    setRole(data.user.role);
+    setInstitutionId(data.user.institutionId || null);
+    setIsSetupComplete(!!data.user.isSetupComplete);
+  } catch {
+    signOut();
+  }
+};
+
 
   const hasRole = (requiredRole) => {
     if (!role) return false;
@@ -97,16 +137,20 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider
-      value={{
-        user,
-        role,
-        loading,
-        signUp,
-        signIn,
-        signOut,
-        hasRole,
-      }}
-    >
+  value={{
+    user,
+    role,
+    institutionId,
+    isSetupComplete,
+    loading,
+    signUp,
+    signIn,
+    signOut,
+    hasRole,
+    refreshUserData,
+  }}
+>
+
       {children}
     </AuthContext.Provider>
   );

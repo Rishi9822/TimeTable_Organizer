@@ -17,6 +17,8 @@ import { Label } from "@/components/ui/label";
 import { useInstitutionContext } from "@/contexts/InstitutionContext";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+
 
 const DAYS = [
   "Monday",
@@ -29,9 +31,10 @@ const DAYS = [
 ];
 
 const SetupWizard = () => {
+
   const navigate = useNavigate();
-  const { config, updateConfig, completeSetup } =
-    useInstitutionContext();
+  const { config, updateConfig, completeSetup, isLoading } = useInstitutionContext();
+  const { refreshUserData } = useAuth();
 
   const [step, setStep] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
@@ -49,19 +52,26 @@ const SetupWizard = () => {
     setIsSaving(true);
     try {
       await completeSetup();
+
+      // 🔥 MUST refresh auth state FIRST
+      await refreshUserData();
+
       toast.success("Institution setup complete!", {
         description: "You can now start creating timetables.",
         icon: <CheckCircle className="w-4 h-4" />,
       });
-      navigate("/builder");
-    } catch {
+
+      // 🔥 FORCE redirect after state sync
+      window.location.replace("/admin");
+    } catch (error) {
       toast.error("Failed to save settings", {
-        description: "Please try again.",
+        description: error?.message || "Please try again.",
       });
     } finally {
       setIsSaving(false);
     }
   };
+
 
   const handleSelectType = (type) => {
     updateConfig({ institutionType: type });
@@ -338,14 +348,14 @@ const SetupWizard = () => {
 
               <div className="space-y-4">
                 {config.breaks.map((breakConfig, index) => (
-                  <div 
+                  <div
                     key={index}
                     className="flex items-center gap-4 p-4 rounded-xl bg-muted/30 border border-border/50"
                   >
                     <div className="w-10 h-10 rounded-lg bg-warning/10 flex items-center justify-center shrink-0">
                       <Coffee className="w-5 h-5 text-warning" />
                     </div>
-                    
+
                     <div className="flex-1 grid sm:grid-cols-3 gap-3">
                       <div>
                         <Label className="text-xs">Label</Label>

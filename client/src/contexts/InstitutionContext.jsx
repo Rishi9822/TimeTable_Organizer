@@ -9,6 +9,9 @@ import {
   useInstitutionSettings,
   useUpsertInstitutionSettings,
 } from "@/hooks/useTeachers";
+import { useAuth } from "@/contexts/AuthContext";
+import api from "@/lib/api";
+
 
 const defaultConfig = {
   institutionName: "",
@@ -52,8 +55,13 @@ const addMinutes = (time, minutes) => {
 
 export const InstitutionProvider = ({ children }) => {
   const [config, setConfig] = useState(defaultConfig);
+  const { user, institutionId, refreshUserData } = useAuth();
 
-  const { data: dbSettings, isLoading } = useInstitutionSettings();
+  const { data: dbSettings, isLoading } = useInstitutionSettings({
+    enabled: Boolean(user && institutionId),
+  });
+
+
   const upsertSettings = useUpsertInstitutionSettings();
 
   useEffect(() => {
@@ -141,22 +149,41 @@ export const InstitutionProvider = ({ children }) => {
   ]);
 
   const completeSetup = useCallback(async () => {
-    generatePeriods();
+  if (!user) throw new Error("User not authenticated");
 
-    await upsertSettings.mutateAsync({
-      institution_name: config.institutionName,
-      institution_type: config.institutionType,
-      working_days: config.workingDays,
-      periods_per_day: config.periodsPerDay,
-      period_duration: config.periodDuration,
-      start_time: config.startTime,
-      lab_duration: config.labDuration,
-      breaks: config.breaks,
-      is_setup_complete: true,
+  generatePeriods();
+
+  let finalInstitutionId = institutionId;
+
+  if (!institutionId) {
+    const res = await api.post("/institutions", {
+      institutionName: config.institutionName || "My Institution",
     });
 
-    setConfig((prev) => ({ ...prev, isSetupComplete: true }));
-  }, [generatePeriods, config, upsertSettings]);
+    finalInstitutionId = res.data.institutionId;
+  }
+
+  await upsertSettings.mutateAsync({
+    institution_id: finalInstitutionId,
+    institution_name: config.institutionName,
+    institution_type: config.institutionType,
+    working_days: config.workingDays,
+    periods_per_day: config.periodsPerDay,
+    period_duration: config.periodDuration,
+    start_time: config.startTime,
+    lab_duration: config.labDuration,
+    breaks: config.breaks,
+  });
+
+  return true;
+}, [
+  user,
+  institutionId,
+  config,
+  generatePeriods,
+  upsertSettings,
+]);
+
 
   return (
     <InstitutionContext.Provider
