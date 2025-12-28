@@ -1,8 +1,8 @@
 import { DndContext, DragOverlay, pointerWithin } from '@dnd-kit/core';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useImperativeHandle, forwardRef, useRef } from 'react';
 import DroppableSlot from './DroppableSlot';
 import DraggableSubject from './DraggableSubjects';
-import { DAYS_SHORT, DEFAULT_PERIODS } from '@/lib/timetable-types';
+import { DAYS, DAYS_SHORT, DEFAULT_PERIODS } from '@/lib/timetable-types';
 import { detectConflicts, getSlotStatus } from '@/lib/conflict-detection';
 import { useTimetableContext } from '@/contexts/TimetableContext';
 import {
@@ -26,11 +26,10 @@ const generateTeacherColor = (name) => {
     return `hsl(${Math.abs(hue)}, 70%, 50%)`;
 };
 
-const TimetableGrid = ({ classId, className: classSectionName }) => {
+const TimetableGrid = forwardRef(({ classId, className: classSectionName, onChange, hasUnsavedChanges }, ref) => {
     const [assignments, setAssignments] = useState(new Map());
     const [activeId, setActiveId] = useState(null);
     const [activeDragData, setActiveDragData] = useState(null);
-
 
     // Fetch data from database
     const { data: teacherClassAssignments = [], isLoading: isLoadingAssignments } =
@@ -40,29 +39,110 @@ const TimetableGrid = ({ classId, className: classSectionName }) => {
     const { data: allSubjects = [] } = useSubjects();
 
     const {
-        addAssignment: addGlobalAssignment,
-        removeAssignment: removeGlobalAssignment,
+        getTimetable,
+        isTeacherAvailable,
         getTeacherConflict,
-        globalAssignments
     } = useTimetableContext();
 
     // Helper functions to get teacher/subject by id
     const getTeacherById = (teacherId) => allTeachers.find(t => t.id === teacherId);
     const getSubjectById = (subjectId) => allSubjects.find(s => s.id === subjectId);
 
-    // Sync local assignments with global context
+    // Track previous classId to ensure proper reset
+    const previousClassIdRef = useRef(classId);
+
+    // Load timetable when classId changes
     useEffect(() => {
-        assignments.forEach((assignment, slotId) => {
-            const [day, periodStr] = slotId.split('-');
-            addGlobalAssignment(classId, {
-                className: classSectionName,
-                day,
-                period: parseInt(periodStr),
-                teacherId: assignment.teacherId,
-                subjectId: assignment.subjectId,
+        // CRITICAL: Reset assignments immediately when classId changes
+        if (previousClassIdRef.current !== classId) {
+            setAssignments(new Map());
+            previousClassIdRef.current = classId;
+        }
+
+        if (!classId) {
+            return;
+        }
+
+        // Only update if we have teachers and subjects loaded
+        if (!allTeachers.length || !allSubjects.length) {
+            // Wait for data to load
+            return;
+        }
+
+        const timetable = getTimetable(classId);
+        
+        if (timetable && timetable.periods) {
+            // Convert periods object to Map structure for UI
+            // CRITICAL: Backend uses full day names ("Monday"), UI uses short names ("Mon")
+            const newAssignments = new Map();
+            const periods = timetable.periods;
+
+            for (const [dayFull, dayPeriods] of Object.entries(periods)) {
+                if (!Array.isArray(dayPeriods)) continue;
+
+                // Convert full day name to short name for slotId
+                const dayIndex = DAYS.indexOf(dayFull);
+                if (dayIndex === -1) continue; // Skip invalid day names
+                const dayShort = DAYS_SHORT[dayIndex];
+
+                for (const periodData of dayPeriods) {
+                    const { period, subjectId, teacherId } = periodData;
+                    // CRITICAL: Use short day name for slotId (UI format)
+                    const slotId = `${dayShort}-${period}`;
+                    
+                    const teacher = getTeacherById(teacherId);
+                    const subject = getSubjectById(subjectId);
+
+                    if (teacher && subject) {
+                        newAssignments.set(slotId, {
+                            teacherSubjectId: `${teacherId}-${subjectId}`,
+                            teacherId,
+                            subjectId,
+                            teacherName: teacher.name,
+                            subjectName: subject.name,
+                            subjectShortName: subject.code || subject.name?.slice(0, 4) || "N/A",
+                            color: subject.color || generateTeacherColor(teacher.name),
+                        });
+                    }
+                }
+            }
+
+            setAssignments(newAssignments);
+        } else {
+            // Empty timetable - ensure it's cleared
+            setAssignments(new Map());
+        }
+    }, [classId, getTimetable, allTeachers.length, allSubjects.length]); // Only depend on lengths, not arrays
+
+    // Expose getPeriods method to parent
+    useImperativeHandle(ref, () => ({
+        getPeriods: () => {
+            // Convert Map to periods object structure
+            const periods = {};
+            const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+            assignments.forEach((assignment, slotId) => {
+                const [dayShort, periodStr] = slotId.split('-');
+                const dayIndex = DAYS_SHORT.indexOf(dayShort);
+                if (dayIndex === -1) return;
+
+                const day = DAYS[dayIndex];
+                const period = parseInt(periodStr);
+
+                if (!periods[day]) {
+                    periods[day] = [];
+                }
+
+                periods[day].push({
+                    period,
+                    subjectId: assignment.subjectId,
+                    teacherId: assignment.teacherId,
+                });
             });
-        });
-    }, []);
+
+            return periods;
+        },
+    }));
 
     const classTeacherAssignments = useMemo(() => {
         return teacherClassAssignments.filter(
@@ -110,18 +190,18 @@ const TimetableGrid = ({ classId, className: classSectionName }) => {
         allTeachers.forEach(teacher => {
             const slots = [];
 
-            globalAssignments.forEach((classAssignmentsArr, otherClassId) => {
-                if (otherClassId === classId) return;
-
-                classAssignmentsArr.forEach(assignment => {
-                    if (assignment.teacherId === teacher.id) {
+            // Check all periods across all days
+            // CRITICAL: Use full day names for conflict detection
+            DAYS.forEach((dayFull, dayIndex) => {
+                const dayShort = DAYS_SHORT[dayIndex];
+                for (let period = 1; period <= 8; period++) {
+                    if (!isTeacherAvailable(teacher.id, dayFull, period, classId)) {
                         slots.push({
-                            day: assignment.day,
-                            period: assignment.period,
-                            className: assignment.className,
+                            day: dayShort, // Store short name for UI display
+                            period,
                         });
                     }
-                });
+                }
             });
 
             if (slots.length > 0) {
@@ -130,19 +210,22 @@ const TimetableGrid = ({ classId, className: classSectionName }) => {
         });
 
         return result;
-    }, [globalAssignments, classId, allTeachers]);
+    }, [isTeacherAvailable, classId, allTeachers]);
 
     // Get unavailable teachers for each slot
-    const getUnavailableTeachersForSlot = (day, period) => {
+    const getUnavailableTeachersForSlot = (dayShort, period) => {
         const unavailable = [];
+        
+        // CRITICAL: Convert short day name to full name for conflict detection
+        const dayIndex = DAYS_SHORT.indexOf(dayShort);
+        if (dayIndex === -1) return unavailable;
+        const dayFull = DAYS[dayIndex];
 
         allTeachers.forEach(teacher => {
-            const conflict = getTeacherConflict(teacher.id, day, period, classId);
-            if (conflict) {
+            if (!isTeacherAvailable(teacher.id, dayFull, period, classId)) {
                 unavailable.push({
                     teacherId: teacher.id,
                     teacherName: teacher.name,
-                    className: conflict.className,
                 });
             }
         });
@@ -171,11 +254,19 @@ const TimetableGrid = ({ classId, className: classSectionName }) => {
         // Don't allow dropping on breaks
         if (over.data.current?.isBreak) return;
 
-        // Check for cross-class conflict
-        const existingConflict = getTeacherConflict(dragData.teacherId, day, period, classId);
-        if (existingConflict) {
+        // CRITICAL: Convert short day name to full name for conflict detection
+        // Backend stores full names ("Monday"), conflict detection needs full names
+        const dayIndex = DAYS_SHORT.indexOf(day);
+        if (dayIndex === -1) return;
+        const dayFull = DAYS[dayIndex];
+
+        // Check for cross-class conflict using backend-aware check
+        if (!isTeacherAvailable(dragData.teacherId, dayFull, period, classId)) {
+            const conflict = getTeacherConflict(dragData.teacherId, dayFull, period, classId);
             toast.error('Teacher conflict detected!', {
-                description: `${dragData.teacherName} is already teaching in ${existingConflict.className} at this time.`,
+                description: conflict 
+                    ? `${dragData.teacherName} is already teaching in another class at this time.`
+                    : `${dragData.teacherName} is not available at this time.`,
                 icon: <AlertCircle className="w-4 h-4" />,
             });
             return;
@@ -198,14 +289,10 @@ const TimetableGrid = ({ classId, className: classSectionName }) => {
             return updated;
         });
 
-        // Update global state
-        addGlobalAssignment(classId, {
-            className: classSectionName,
-            day,
-            period,
-            teacherId: dragData.teacherId,
-            subjectId: dragData.subjectId,
-        });
+        // Notify parent of change
+        if (onChange) {
+            onChange();
+        }
 
         toast.success('Period assigned!', {
             description: `${dragData.subjectName} with ${dragData.teacherName}`,
@@ -214,15 +301,16 @@ const TimetableGrid = ({ classId, className: classSectionName }) => {
     };
 
     const handleRemoveAssignment = (slotId) => {
-        const [day, periodStr] = slotId.split('-');
-
         setAssignments(prev => {
             const updated = new Map(prev);
             updated.delete(slotId);
             return updated;
         });
 
-        removeGlobalAssignment(classId, day, parseInt(periodStr));
+        // Notify parent of change
+        if (onChange) {
+            onChange();
+        }
     };
 
     // Filter working days (Mon-Fri for now)
@@ -235,12 +323,17 @@ const TimetableGrid = ({ classId, className: classSectionName }) => {
     const crossClassConflicts = useMemo(() => {
         let count = 0;
         assignments.forEach((assignment, slotId) => {
-            const [day, periodStr] = slotId.split('-');
-            const conflict = getTeacherConflict(assignment.teacherId, day, parseInt(periodStr), classId);
-            if (conflict) count++;
+            const [dayShort, periodStr] = slotId.split('-');
+            const dayIndex = DAYS_SHORT.indexOf(dayShort);
+            if (dayIndex === -1) return;
+            const dayFull = DAYS[dayIndex];
+            const period = parseInt(periodStr);
+            if (!isTeacherAvailable(assignment.teacherId, dayFull, period, classId)) {
+                count++;
+            }
         });
         return count;
-    }, [assignments, getTeacherConflict, classId]);
+    }, [assignments, isTeacherAvailable, classId]);
 
     // Build teacher-subject pairs for the sidebar from database
     const teacherSubjectPairs = useMemo(() => {
@@ -334,13 +427,14 @@ const TimetableGrid = ({ classId, className: classSectionName }) => {
                         </div>
                     )}
 
-                    {/* Global assignment count */}
-                    <div className="mt-4 p-3 rounded-xl bg-muted/50 border border-border/50">
-                        <h4 className="text-xs font-medium text-muted-foreground mb-1">Global Status</h4>
-                        <p className="text-sm text-foreground">
-                            {Array.from(globalAssignments.values()).reduce((acc, arr) => acc + arr.length, 0)} total assignments across {globalAssignments.size} classes
-                        </p>
-                    </div>
+                    {/* Save status */}
+                    {hasUnsavedChanges && (
+                        <div className="mt-4 p-3 rounded-xl bg-warning/10 border border-warning/20">
+                            <p className="text-xs text-warning-foreground">
+                                ⚠️ You have unsaved changes
+                            </p>
+                        </div>
+                    )}
                 </div>
 
                 {/* Main Grid */}
@@ -403,19 +497,25 @@ const TimetableGrid = ({ classId, className: classSectionName }) => {
 
                                     {/* Day cells */}
                                     {workingDays.map(day => {
-                                        const slotId = `${day}-${periodIndex}`;
+                                        // Use period number, not index (for breaks, period.number is 0)
+                                        const periodNum = period.number || periodIndex;
+                                        const slotId = `${day}-${periodNum}`;
                                         const assignment = assignments.get(slotId);
                                         const slotStatus = getSlotStatus(slotId, conflicts);
-                                        const unavailableTeachers = getUnavailableTeachersForSlot(day, periodIndex);
+                                        const unavailableTeachers = getUnavailableTeachersForSlot(day, periodNum);
 
                                         // Check for cross-class conflict on this slot
                                         let hasCrossClassConflict = false;
-                                        if (assignment) {
-                                            const crossConflict = getTeacherConflict(assignment.teacherId, day, periodIndex, classId);
-                                            if (crossConflict) {
-                                                hasCrossClassConflict = true;
-                                                if (!slotStatus.messages.includes(`Teacher busy in ${crossConflict.className}`)) {
-                                                    slotStatus.messages.push(`Teacher busy in ${crossConflict.className}`);
+                                        if (assignment && !period.isBreak) {
+                                            // CRITICAL: Convert short day name to full name
+                                            const dayIndex = DAYS_SHORT.indexOf(day);
+                                            if (dayIndex !== -1) {
+                                                const dayFull = DAYS[dayIndex];
+                                                if (!isTeacherAvailable(assignment.teacherId, dayFull, periodNum, classId)) {
+                                                    hasCrossClassConflict = true;
+                                                    if (!slotStatus.messages.includes('Teacher busy in another class')) {
+                                                        slotStatus.messages.push('Teacher busy in another class');
+                                                    }
                                                 }
                                             }
                                         }
@@ -471,6 +571,8 @@ const TimetableGrid = ({ classId, className: classSectionName }) => {
             </DragOverlay>
         </DndContext>
     );
-};
+});
+
+TimetableGrid.displayName = 'TimetableGrid';
 
 export default TimetableGrid;
