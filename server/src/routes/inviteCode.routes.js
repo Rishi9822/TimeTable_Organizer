@@ -4,6 +4,7 @@ import { requireRole } from "../middleware/roleMiddleware.js";
 import {
   getInviteCodes,
   createInviteCode,
+  deleteInviteCode,
 } from "../controllers/inviteCode.controller.js";
 
 const router = express.Router();
@@ -28,6 +29,18 @@ router.post(
   authMiddleware,
   requireRole(["admin"]),
   createInviteCode
+);
+
+/**
+ * DELETE /api/institutions/invite-codes/:id
+ * Only admins can delete invite codes
+ * Multi-tenant safety: Admin can only delete codes from their own institution
+ */
+router.delete(
+  "/invite-codes/:id",
+  authMiddleware,
+  requireRole(["admin"]),
+  deleteInviteCode
 );
 
 export default router;

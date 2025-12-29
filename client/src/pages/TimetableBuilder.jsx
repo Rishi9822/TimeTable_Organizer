@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   ArrowLeft, 
@@ -9,47 +9,110 @@ import {
   Settings,
   CheckCircle,
   AlertCircle,
-  Users
+  Users,
+  Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import TimetableGrid from '@/components/timetable/TimetableGrid';
 import ClassSelector from '@/components/timetable/ClassSelector';
 import { UserMenu } from '@/components/auth/UserMenu';
 import { useClasses } from '@/hooks/useTeachers';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTimetableContext } from '@/contexts/TimetableContext';
 import { toast } from 'sonner';
 
 const TimetableBuilder = () => {
   const { hasRole } = useAuth();
   const { data: classes = [] } = useClasses();
+  const { loadTimetable, loadAllTimetables, saveTimetable, isLoading, isSaving } = useTimetableContext();
   
   const [selectedClassId, setSelectedClassId] = useState('');
   const [selectedClassName, setSelectedClassName] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [pendingClassSwitch, setPendingClassSwitch] = useState(null);
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  const timetableRef = useRef(null); // Reference to get current periods from TimetableGrid
+
+  // Load all timetables on mount for conflict detection
+  useEffect(() => {
+    loadAllTimetables();
+  }, [loadAllTimetables]);
 
   // Auto-select first class when data loads
   useEffect(() => {
     if (classes.length > 0 && !selectedClassId) {
       const firstClass = classes[0];
-      setSelectedClassId(firstClass.id);
-      setSelectedClassName(firstClass.section ? `${firstClass.name} - ${firstClass.section}` : firstClass.name);
+      handleSelectClass(firstClass.id, firstClass.section ? `${firstClass.name} - ${firstClass.section}` : firstClass.name, true);
     }
   }, [classes, selectedClassId]);
 
-const handleSelectClass = (classId, className) => {
+  // Load timetable when class changes
+  useEffect(() => {
+    if (selectedClassId) {
+      loadTimetable(selectedClassId);
+      setHasUnsavedChanges(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedClassId]); // Only depend on selectedClassId, loadTimetable is stable
+
+  const handleSelectClass = async (classId, className, skipCheck = false) => {
+    // Check for unsaved changes
+    if (!skipCheck && hasUnsavedChanges) {
+      setPendingClassSwitch({ classId, className });
+      setShowUnsavedDialog(true);
+      return;
+    }
+
     setSelectedClassId(classId);
     setSelectedClassName(className);
+    setHasUnsavedChanges(false);
   };
 
-  const handleSave = async () => {
-    setIsSaving(true);
-    // Simulate save
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setIsSaving(false);
-    toast.success('Timetable saved successfully!', {
-      description: `Changes for ${selectedClassName} have been saved.`,
-      icon: <CheckCircle className="w-4 h-4" />,
-    });
+  const handleConfirmSwitch = () => {
+    if (pendingClassSwitch) {
+      setSelectedClassId(pendingClassSwitch.classId);
+      setSelectedClassName(pendingClassSwitch.className);
+      setHasUnsavedChanges(false);
+      setPendingClassSwitch(null);
+    }
+    setShowUnsavedDialog(false);
+  };
+
+  const handleCancelSwitch = () => {
+    setPendingClassSwitch(null);
+    setShowUnsavedDialog(false);
+  };
+
+  const handleSave = async (periods) => {
+    if (!selectedClassId) return;
+
+    try {
+      await saveTimetable(selectedClassId, periods || timetableRef.current?.getPeriods?.());
+      setHasUnsavedChanges(false);
+      toast.success('Timetable saved successfully!', {
+        description: `Changes for ${selectedClassName} have been saved.`,
+        icon: <CheckCircle className="w-4 h-4" />,
+      });
+    } catch (error) {
+      toast.error('Failed to save timetable', {
+        description: error.response?.data?.message || 'Please try again.',
+        icon: <AlertCircle className="w-4 h-4" />,
+      });
+    }
+  };
+
+  const handleTimetableChange = () => {
+    setHasUnsavedChanges(true);
   };
 
   const handleExport = () => {
@@ -115,12 +178,21 @@ const handleSelectClass = (classId, className) => {
               <Button 
                 variant="hero" 
                 size="sm" 
-                onClick={handleSave}
-                disabled={isSaving}
+                onClick={() => handleSave()}
+                disabled={isSaving(selectedClassId) || !hasUnsavedChanges}
                 className="gap-2"
               >
-                <Save className="w-4 h-4" />
-                {isSaving ? 'Saving...' : 'Save'}
+                {isSaving(selectedClassId) ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    Save
+                  </>
+                )}
               </Button>
               <UserMenu />
             </div>
@@ -138,10 +210,19 @@ const handleSelectClass = (classId, className) => {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {selectedClassId ? (
+        {isLoading(selectedClassId) ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
+            <p className="text-muted-foreground">Loading timetable...</p>
+          </div>
+        ) : selectedClassId ? (
           <TimetableGrid 
+            ref={timetableRef}
             classId={selectedClassId}
             className={selectedClassName}
+            onSave={handleSave}
+            onChange={handleTimetableChange}
+            hasUnsavedChanges={hasUnsavedChanges}
           />
         ) : (
           <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -179,6 +260,34 @@ const handleSelectClass = (classId, className) => {
           </div>
         </div>
       )}
+
+      {/* Unsaved Changes Dialog */}
+      <AlertDialog open={showUnsavedDialog} onOpenChange={setShowUnsavedDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes to the timetable for {selectedClassName}. 
+              Do you want to save before switching classes?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleCancelSwitch}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmSwitch}>
+              Switch Without Saving
+            </AlertDialogAction>
+            <AlertDialogAction 
+              onClick={async () => {
+                await handleSave();
+                handleConfirmSwitch();
+              }}
+              className="bg-primary text-primary-foreground"
+            >
+              Save & Switch
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

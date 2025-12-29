@@ -9,6 +9,7 @@ import institutionRoutes from "./routes/institution.routes.js";
 import authRoutes from "./routes/authRoutes.js";
 import institutionSettingsRoutes from "./routes/institutionSettings.routes.js";
 import inviteCodeRoutes from "./routes/inviteCode.routes.js";
+import timetableRoutes from "./routes/timetable.routes.js";
 
 
 
@@ -30,6 +31,7 @@ app.use("/api", assignmentRoutes);
 app.use("/api/institutions", institutionRoutes, inviteCodeRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/institution-settings", institutionSettingsRoutes);
+app.use("/api/timetables", timetableRoutes);
 
 
 app.get("/api/health", (req, res) => {
