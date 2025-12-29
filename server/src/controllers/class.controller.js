@@ -1,4 +1,5 @@
 import Class from "../models/Class.js";
+import { logAuditFromRequest } from "../utils/auditLogger.js";
 
 export const getClasses = async (req, res) => {
   try {
@@ -36,6 +37,16 @@ export const createClass = async (req, res) => {
       ...req.body,
       institutionId: req.user.institutionId,
     });
+
+    // Audit log: Log AFTER successful creation
+    logAuditFromRequest(
+      req,
+      "CREATE_CLASS",
+      "class",
+      cls._id,
+      { className: cls.name, section: cls.section }
+    ).catch(() => {}); // Silently ignore logging errors
+
     res.status(201).json(cls);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -55,6 +66,16 @@ export const deleteClass = async (req, res) => {
     }
 
     await Class.findByIdAndDelete(req.params.id);
+
+    // Audit log: Log AFTER successful deletion
+    logAuditFromRequest(
+      req,
+      "DELETE_CLASS",
+      "class",
+      req.params.id,
+      { className: cls.name, section: cls.section }
+    ).catch(() => {}); // Silently ignore logging errors
+
     res.json({ success: true });
   } catch (err) {
     res.status(400).json({ message: err.message });

@@ -1,4 +1,5 @@
 import Subject from "../models/Subject.js";
+import { logAuditFromRequest } from "../utils/auditLogger.js";
 
 export const getSubjects = async (req, res) => {
   try {
@@ -32,6 +33,16 @@ export const createSubject = async (req, res) => {
       ...req.body,
       institutionId: req.user.institutionId,
     });
+
+    // Audit log: Log AFTER successful creation
+    logAuditFromRequest(
+      req,
+      "CREATE_SUBJECT",
+      "subject",
+      subject._id,
+      { subjectName: subject.name, subjectCode: subject.code }
+    ).catch(() => {}); // Silently ignore logging errors
+
     res.status(201).json(subject);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -51,6 +62,16 @@ export const deleteSubject = async (req, res) => {
     }
 
     await Subject.findByIdAndDelete(req.params.id);
+
+    // Audit log: Log AFTER successful deletion
+    logAuditFromRequest(
+      req,
+      "DELETE_SUBJECT",
+      "subject",
+      req.params.id,
+      { subjectName: subject.name, subjectCode: subject.code }
+    ).catch(() => {}); // Silently ignore logging errors
+
     res.json({ success: true });
   } catch (err) {
     res.status(400).json({ message: err.message });

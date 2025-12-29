@@ -19,6 +19,7 @@ import UserDashboard from "@/pages/UserDashboard";
 import JoinInstitution from "@/pages/JoinInstitution";
 import Auth from "@/pages/Auth";
 import NotFound from "@/pages/NotFound";
+import ActivityLog from "@/pages/ActivityLog";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -89,6 +90,15 @@ const App = () => {
                     element={
                       <ProtectedRoute requiredRoles={["admin", "scheduler"]}>
                         <TeacherManagement />
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/activity-log"
+                    element={
+                      <ProtectedRoute requiredRoles={["admin", "scheduler"]}>
+                        <ActivityLog />
                       </ProtectedRoute>
                     }
                   />

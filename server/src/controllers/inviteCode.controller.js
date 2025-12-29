@@ -1,4 +1,5 @@
 import InviteCode from "../models/InviteCode.js";
+import { logAuditFromRequest } from "../utils/auditLogger.js";
 
 /* GET codes for institution */
 export const getInviteCodes = async (req, res) => {
@@ -42,6 +43,15 @@ export const createInviteCode = async (req, res) => {
       maxUses: maxUses || null,
     });
 
+    // Audit log: Log AFTER successful creation
+    logAuditFromRequest(
+      req,
+      "CREATE_INVITE_CODE",
+      "invite_code",
+      invite._id,
+      { code: invite.code, maxUses: invite.maxUses }
+    ).catch(() => {}); // Silently ignore logging errors
+
     res.status(201).json(invite);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -70,6 +80,15 @@ export const deleteInviteCode = async (req, res) => {
       _id: id,
       institutionId: req.user.institutionId,
     });
+
+    // Audit log: Log AFTER successful deletion
+    logAuditFromRequest(
+      req,
+      "DELETE_INVITE_CODE",
+      "invite_code",
+      id,
+      { code: inviteCode.code }
+    ).catch(() => {}); // Silently ignore logging errors
 
     res.json({ success: true, message: "Invite code deleted successfully" });
   } catch (error) {
