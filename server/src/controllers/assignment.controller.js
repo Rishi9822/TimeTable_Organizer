@@ -3,6 +3,7 @@ import TeacherClassAssignment from "../models/TeacherClassAssignment.js";
 import Teacher from "../models/Teacher.js";
 import Subject from "../models/Subject.js";
 import Class from "../models/Class.js";
+import { logAuditFromRequest } from "../utils/auditLogger.js";
 
 /**
  * GET /api/teacher-subjects
@@ -76,6 +77,15 @@ export const assignTeacherSubject = async (req, res) => {
       institutionId: req.user.institutionId,
     });
 
+    // Audit log: Log AFTER successful assignment
+    logAuditFromRequest(
+      req,
+      "ASSIGN_TEACHER_SUBJECT",
+      "teacher_subject",
+      assignment._id,
+      { teacherName: teacher.name, subjectName: subject.name }
+    ).catch(() => {}); // Silently ignore logging errors
+
     res.status(201).json(assignment);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -109,6 +119,19 @@ export const removeTeacherSubject = async (req, res) => {
     if (!assignment) {
       return res.status(404).json({ message: "Assignment not found" });
     }
+
+    // Get teacher and subject names for audit log
+    const teacher = await Teacher.findById(teacherId);
+    const subject = await Subject.findById(subjectId);
+
+    // Audit log: Log AFTER successful removal
+    logAuditFromRequest(
+      req,
+      "REMOVE_TEACHER_SUBJECT",
+      "teacher_subject",
+      assignment._id,
+      { teacherName: teacher?.name, subjectName: subject?.name }
+    ).catch(() => {}); // Silently ignore logging errors
 
     res.json({ message: "Subject removed from teacher" });
   } catch (err) {

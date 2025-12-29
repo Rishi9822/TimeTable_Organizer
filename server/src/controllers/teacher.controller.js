@@ -2,6 +2,7 @@ import Teacher from "../models/Teacher.js";
 import TeacherSubject from "../models/TeacherSubject.js";
 import TeacherClassAssignment from "../models/TeacherClassAssignment.js";
 import Timetable from "../models/Timetable.js";
+import { logAuditFromRequest } from "../utils/auditLogger.js";
 
 export const getTeachers = async (req, res) => {
   try {
@@ -35,6 +36,16 @@ export const createTeacher = async (req, res) => {
       ...req.body,
       institutionId: req.user.institutionId,
     });
+
+    // Audit log: Log AFTER successful creation
+    logAuditFromRequest(
+      req,
+      "CREATE_TEACHER",
+      "teacher",
+      teacher._id,
+      { teacherName: teacher.name }
+    ).catch(() => {}); // Silently ignore logging errors
+
     res.status(201).json(teacher);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -62,6 +73,16 @@ export const updateTeacher = async (req, res) => {
       updateData,
       { new: true }
     );
+
+    // Audit log: Log AFTER successful update
+    logAuditFromRequest(
+      req,
+      "UPDATE_TEACHER",
+      "teacher",
+      updated._id,
+      { teacherName: updated.name }
+    ).catch(() => {}); // Silently ignore logging errors
+
     res.json(updated);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -146,6 +167,15 @@ export const deleteTeacher = async (req, res) => {
 
     // 4. Finally, delete the teacher document
     await Teacher.findByIdAndDelete(teacherId);
+
+    // Audit log: Log AFTER successful deletion
+    logAuditFromRequest(
+      req,
+      "DELETE_TEACHER",
+      "teacher",
+      teacherId,
+      { teacherName: teacher.name }
+    ).catch(() => {}); // Silently ignore logging errors
 
     res.json({
       success: true,

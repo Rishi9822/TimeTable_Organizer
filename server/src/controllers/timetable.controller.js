@@ -2,6 +2,7 @@ import Timetable from "../models/Timetable.js";
 import Class from "../models/Class.js";
 import Teacher from "../models/Teacher.js";
 import Subject from "../models/Subject.js";
+import { logAuditFromRequest } from "../utils/auditLogger.js";
 
 /**
  * GET /api/timetables
@@ -188,6 +189,16 @@ export const saveTimetable = async (req, res) => {
     if (response.periods instanceof Map) {
       response.periods = Object.fromEntries(response.periods);
     }
+
+    // Audit log: Log AFTER successful save
+    logAuditFromRequest(
+      req,
+      "SAVE_TIMETABLE",
+      "timetable",
+      timetable._id,
+      { className: classEntity.name, classId: classId, academicYear: finalAcademicYear }
+    ).catch(() => {}); // Silently ignore logging errors
+
     res.json(response);
   } catch (error) {
     console.error("Save timetable error:", error);
@@ -266,6 +277,15 @@ export const publishTimetable = async (req, res) => {
     if (response.periods instanceof Map) {
       response.periods = Object.fromEntries(response.periods);
     }
+
+    // Audit log: Log AFTER successful publish
+    logAuditFromRequest(
+      req,
+      "PUBLISH_TIMETABLE",
+      "timetable",
+      draft._id,
+      { className: classEntity.name, classId: classId, academicYear }
+    ).catch(() => {}); // Silently ignore logging errors
 
     res.json({
       message: "Timetable published successfully",

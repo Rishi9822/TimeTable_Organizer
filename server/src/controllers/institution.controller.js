@@ -2,6 +2,7 @@ import InstitutionSettings from "../models/InstitutionSettings.js";
 import Institution from "../models/Institution.js";
 import User from "../models/User.js";
 import InviteCode from "../models/InviteCode.js";
+import { logAuditFromRequest } from "../utils/auditLogger.js";
 /**
  * GET /api/institution-settings
  * CRITICAL: Only admins can access (enforced by route middleware)
@@ -48,6 +49,15 @@ export const upsertInstitutionSettings = async (req, res) => {
       { new: true, upsert: true }
     );
 
+    // Audit log: Log AFTER successful settings update
+    logAuditFromRequest(
+      req,
+      "UPDATE_INSTITUTION_SETTINGS",
+      "institution",
+      req.user.institutionId,
+      {}
+    ).catch(() => {}); // Silently ignore logging errors
+
     res.json(settings);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -72,6 +82,15 @@ export const setupInstitution = async (req, res) => {
       },
       { new: true }
     );
+
+    // Audit log: Log AFTER successful setup completion
+    logAuditFromRequest(
+      req,
+      "COMPLETE_INSTITUTION_SETUP",
+      "institution",
+      institution._id,
+      { institutionName: institution.name }
+    ).catch(() => {}); // Silently ignore logging errors
   } else {
     // ✅ CREATE ONCE
     institution = await Institution.create({
@@ -83,6 +102,15 @@ export const setupInstitution = async (req, res) => {
     await User.findByIdAndUpdate(req.user._id, {
       institutionId: institution._id,
     });
+
+    // Audit log: Log AFTER successful institution creation
+    logAuditFromRequest(
+      req,
+      "CREATE_INSTITUTION",
+      "institution",
+      institution._id,
+      { institutionName: institution.name }
+    ).catch(() => {}); // Silently ignore logging errors
   }
 
   res.json({

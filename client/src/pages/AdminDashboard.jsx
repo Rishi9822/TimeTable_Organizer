@@ -17,6 +17,7 @@ import {
   BookOpen,
   LayoutGrid,
   ArrowRight,
+  FileText,
 } from "lucide-react";
 
 const AdminDashboard = () => {
@@ -139,6 +140,26 @@ const AdminDashboard = () => {
 
           {/* Invite Codes */}
           <InviteCodesCard />
+
+          {/* Activity Log */}
+          <Card>
+            <CardHeader>
+              <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center mb-2">
+                <FileText className="h-5 w-5 text-secondary-foreground" />
+              </div>
+              <CardTitle className="text-lg">Activity Log</CardTitle>
+              <CardDescription>
+                View audit trail of all actions performed
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link to="/activity-log">
+                <Button variant="outline" className="w-full">
+                  View Activity Log
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
         </div>
       </main>
     </div>
