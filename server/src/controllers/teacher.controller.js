@@ -2,6 +2,8 @@ import Teacher from "../models/Teacher.js";
 import TeacherSubject from "../models/TeacherSubject.js";
 import TeacherClassAssignment from "../models/TeacherClassAssignment.js";
 import Timetable from "../models/Timetable.js";
+import Institution from "../models/Institution.js";
+import { getPlanLimits, hasReachedTeacherLimit } from "../utils/planLimits.js";
 import { logAuditFromRequest } from "../utils/auditLogger.js";
 
 export const getTeachers = async (req, res) => {
@@ -30,6 +32,27 @@ export const createTeacher = async (req, res) => {
         message: "You must be part of an institution to create teachers",
       });
     }
+
+    // Check plan limits (only for trial plan, paid plans have no limits)
+    const institution = await Institution.findById(req.user.institutionId);
+    if (institution && institution.plan === "trial") {
+      // Only enforce limits for trial plan
+      const currentTeacherCount = await Teacher.countDocuments({
+        institutionId: req.user.institutionId,
+      });
+
+      if (hasReachedTeacherLimit(institution.plan, currentTeacherCount)) {
+        const limits = getPlanLimits(institution.plan);
+        return res.status(403).json({
+          message: `You have reached the maximum number of teachers (${limits.maxTeachers}) for your trial plan. Please upgrade your plan to add more teachers.`,
+          limitReached: true,
+          currentCount: currentTeacherCount,
+          maxAllowed: limits.maxTeachers,
+          plan: institution.plan,
+        });
+      }
+    }
+    // Paid plans (standard/flex) have unlimited teachers - no check needed
 
     // CRITICAL: Force institutionId from authenticated user
     const teacher = await Teacher.create({

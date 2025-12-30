@@ -86,11 +86,20 @@ router.post("/register", authLimiter, async (req, res) => {
       emailVerified: false, // Explicitly set to false for new users
     });
 
-    // Send verification email (non-blocking)
-    sendVerificationEmail(email, name, verificationToken).catch((err) => {
-      console.error("Failed to send verification email:", err);
-      // Don't fail registration if email fails
-    });
+    // Send verification email (non-blocking, but log result)
+    sendVerificationEmail(email, name, verificationToken)
+      .then((result) => {
+        if (result.success) {
+          console.log(`✅ [AUTH] Verification email queued for ${email}`);
+        } else {
+          console.warn(`⚠️ [AUTH] Failed to send verification email to ${email}: ${result.error}`);
+          // Note: Registration still succeeds even if email fails
+        }
+      })
+      .catch((err) => {
+        console.error(`❌ [AUTH] Error in verification email send promise for ${email}:`, err);
+        // Don't fail registration if email fails - user can request resend
+      });
 
     const token = jwt.sign(
       { id: user._id },
@@ -185,13 +194,6 @@ router.get("/me", authMiddleware, async (req, res) => {
     isSetupComplete = Boolean(institution?.isSetupComplete);
   }
 
-  console.log("AUTH /me DEBUG", {
-    userId: user._id,
-    institutionId: user.institutionId,
-    institutionExists: !!institution,
-    institutionSetupFlag: institution?.isSetupComplete,
-  });
-
   res.json({
     user: {
       id: user._id,
@@ -208,43 +210,64 @@ router.get("/me", authMiddleware, async (req, res) => {
 /**
  * Email Verification Endpoint
  * GET /auth/verify-email?token=...
+ * Idempotent: Can be called multiple times safely (if already verified, redirects to success)
  */
 router.get("/verify-email", async (req, res) => {
   try {
     const { token } = req.query;
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
 
     if (!token) {
-      return res.redirect(`${process.env.FRONTEND_URL || "http://localhost:5173"}/auth?error=invalid_token`);
+      console.warn("[AUTH] Verification attempted without token");
+      return res.redirect(`${frontendUrl}/auth?error=invalid_token`);
     }
 
     const hashedToken = hashToken(token);
 
+    // Find user with this token (even if expired, to check if already verified)
     const user = await User.findOne({
       emailVerificationToken: hashedToken,
-      emailVerificationExpires: { $gt: new Date() },
     });
 
+    // If user not found with this token, check if token is expired or invalid
     if (!user) {
-      return res.redirect(`${process.env.FRONTEND_URL || "http://localhost:5173"}/auth?error=invalid_or_expired_token`);
+      console.warn("[AUTH] Verification attempted with invalid token");
+      return res.redirect(`${frontendUrl}/auth?error=invalid_or_expired_token`);
     }
 
-    // Mark email as verified and clear token fields
+    // Idempotency: If already verified, redirect to success page
+    if (user.emailVerified) {
+      console.log(`[AUTH] User ${user.email} already verified, redirecting to success`);
+      return res.redirect(`${frontendUrl}/auth/verify-email-success`);
+    }
+
+    // Check if token is expired
+    if (user.emailVerificationExpires && new Date() > new Date(user.emailVerificationExpires)) {
+      console.warn(`[AUTH] Verification token expired for user ${user.email}`);
+      return res.redirect(`${frontendUrl}/auth?error=invalid_or_expired_token`);
+    }
+
+    // Mark email as verified and clear token fields (idempotent save)
     user.emailVerified = true;
     user.emailVerificationToken = undefined;
     user.emailVerificationExpires = undefined;
     await user.save();
 
+    console.log(`✅ [AUTH] Email verified successfully for user: ${user.email}`);
+
     // Redirect to success page
-    return res.redirect(`${process.env.FRONTEND_URL || "http://localhost:5173"}/auth/verify-email-success`);
+    return res.redirect(`${frontendUrl}/auth/verify-email-success`);
   } catch (error) {
-    console.error("Email verification error:", error);
-    return res.redirect(`${process.env.FRONTEND_URL || "http://localhost:5173"}/auth?error=verification_failed`);
+    console.error("❌ [AUTH] Email verification error:", error);
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    return res.redirect(`${frontendUrl}/auth?error=verification_failed`);
   }
 });
 
 /**
  * Resend Verification Email
  * POST /auth/resend-verification
+ * Regenerates token and invalidates old one
  */
 router.post("/resend-verification", strictLimiter, async (req, res) => {
   try {
@@ -258,30 +281,42 @@ router.post("/resend-verification", strictLimiter, async (req, res) => {
 
     // Always return success to prevent user enumeration
     if (!user) {
+      console.log(`[AUTH] Resend verification requested for non-existent email: ${email}`);
       return res.json({ message: "If an account exists, a verification email has been sent" });
     }
 
     // If already verified, return success without sending
     if (user.emailVerified) {
+      console.log(`[AUTH] Resend verification requested for already verified user: ${email}`);
       return res.json({ message: "Email is already verified" });
     }
 
-    // Generate new verification token
+    // Generate new verification token (invalidates old token)
     const verificationToken = generateSecureToken();
     const hashedToken = hashToken(verificationToken);
     const verificationExpires = new Date();
     verificationExpires.setHours(verificationExpires.getHours() + 24); // 24 hours
 
+    // Update user with new token (this invalidates the old one)
     user.emailVerificationToken = hashedToken;
     user.emailVerificationExpires = verificationExpires;
     await user.save();
 
-    // Send verification email
-    await sendVerificationEmail(user.email, user.name, verificationToken);
+    console.log(`[AUTH] New verification token generated for ${email}`);
+
+    // Send verification email and log result
+    const emailResult = await sendVerificationEmail(user.email, user.name, verificationToken);
+    
+    if (!emailResult.success) {
+      console.warn(`⚠️ [AUTH] Failed to send resend verification email to ${email}: ${emailResult.error}`);
+      // Still return success to prevent user enumeration
+    } else {
+      console.log(`✅ [AUTH] Resend verification email sent to ${email}`);
+    }
 
     return res.json({ message: "If an account exists, a verification email has been sent" });
   } catch (error) {
-    console.error("Resend verification error:", error);
+    console.error("❌ [AUTH] Resend verification error:", error);
     // Still return success to prevent user enumeration
     return res.json({ message: "If an account exists, a verification email has been sent" });
   }
@@ -316,12 +351,19 @@ router.post("/forgot-password", strictLimiter, async (req, res) => {
     user.passwordResetExpires = resetExpires;
     await user.save();
 
-    // Send password reset email
-    await sendPasswordResetEmail(user.email, user.name, resetToken);
+    // Send password reset email and log result
+    const emailResult = await sendPasswordResetEmail(user.email, user.name, resetToken);
+    
+    if (!emailResult.success) {
+      console.warn(`⚠️ [AUTH] Failed to send password reset email to ${user.email}: ${emailResult.error}`);
+      // Still return success to prevent user enumeration
+    } else {
+      console.log(`✅ [AUTH] Password reset email sent to ${user.email}`);
+    }
 
     return res.json({ message: "If an account exists, a password reset email has been sent" });
   } catch (error) {
-    console.error("Forgot password error:", error);
+    console.error("❌ [AUTH] Forgot password error:", error);
     // Still return success to prevent user enumeration
     return res.json({ message: "If an account exists, a password reset email has been sent" });
   }
@@ -330,6 +372,7 @@ router.post("/forgot-password", strictLimiter, async (req, res) => {
 /**
  * Reset Password
  * POST /auth/reset-password
+ * Validates token expiration and updates password
  */
 router.post("/reset-password", strictLimiter, async (req, res) => {
   try {
@@ -346,24 +389,38 @@ router.post("/reset-password", strictLimiter, async (req, res) => {
 
     const hashedToken = hashToken(token);
 
+    // Find user with this token (check expiration explicitly)
     const user = await User.findOne({
       passwordResetToken: hashedToken,
-      passwordResetExpires: { $gt: new Date() },
     });
 
     if (!user) {
+      console.warn("[AUTH] Password reset attempted with invalid token");
+      return res.status(400).json({ message: "Invalid or expired reset token" });
+    }
+
+    // Check if token is expired
+    if (!user.passwordResetExpires || new Date() > new Date(user.passwordResetExpires)) {
+      console.warn(`[AUTH] Password reset token expired for user ${user.email}`);
+      // Clear expired token
+      user.passwordResetToken = undefined;
+      user.passwordResetExpires = undefined;
+      await user.save();
       return res.status(400).json({ message: "Invalid or expired reset token" });
     }
 
     // Update password (will be hashed by pre-save hook)
     user.password = password;
+    // Clear reset token after successful password change
     user.passwordResetToken = undefined;
     user.passwordResetExpires = undefined;
     await user.save();
 
+    console.log(`✅ [AUTH] Password reset successful for user: ${user.email}`);
+
     return res.json({ message: "Password has been reset successfully" });
   } catch (error) {
-    console.error("Reset password error:", error);
+    console.error("❌ [AUTH] Reset password error:", error);
     res.status(500).json({ message: "Failed to reset password" });
   }
 });

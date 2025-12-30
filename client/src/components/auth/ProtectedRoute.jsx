@@ -62,13 +62,22 @@ export const ProtectedRoute = ({ children, requiredRoles }) => {
 
   // 3️⃣ ADMIN FLOW
   if (role === "admin") {
-    // No institution yet → force setup
-    if (!institutionId && currentPath !== "/setup") {
+    // CRITICAL: Block setup if email is not verified
+    if (!emailVerified && currentPath === "/setup") {
+      // Allow access to setup page but it will show warning and disable completion
+      // Backend will enforce the restriction
+    } else if (!emailVerified && currentPath !== "/auth" && currentPath !== "/") {
+      // Redirect unverified admins to auth page to see verification banner
+      return <Navigate to="/auth" replace />;
+    }
+
+    // No institution yet → force setup (only if verified)
+    if (emailVerified && !institutionId && currentPath !== "/setup") {
       return <Navigate to="/setup" replace />;
     }
 
-    // Institution exists but setup incomplete → force setup
-    if (institutionId && !isSetupComplete && currentPath !== "/setup") {
+    // Institution exists but setup incomplete → force setup (only if verified)
+    if (emailVerified && institutionId && !isSetupComplete && currentPath !== "/setup") {
       return <Navigate to="/setup" replace />;
     }
 

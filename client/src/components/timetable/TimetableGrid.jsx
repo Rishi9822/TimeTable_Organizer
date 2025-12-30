@@ -5,6 +5,7 @@ import DraggableSubject from './DraggableSubjects';
 import { DAYS, DAYS_SHORT, DEFAULT_PERIODS } from '@/lib/timetable-types';
 import { detectConflicts, getSlotStatus } from '@/lib/conflict-detection';
 import { useTimetableContext } from '@/contexts/TimetableContext';
+import { useDemo } from '@/contexts/DemoContext';
 import {
     useTeacherClassAssignments,
     useTeachers,
@@ -26,7 +27,7 @@ const generateTeacherColor = (name) => {
     return `hsl(${Math.abs(hue)}, 70%, 50%)`;
 };
 
-const TimetableGrid = forwardRef(({ classId, className: classSectionName, onChange, hasUnsavedChanges }, ref) => {
+const RealTimetableGrid = forwardRef(({ classId, className: classSectionName, onChange, hasUnsavedChanges }, ref) => {
     const [assignments, setAssignments] = useState(new Map());
     const [activeId, setActiveId] = useState(null);
     const [activeDragData, setActiveDragData] = useState(null);
@@ -580,6 +581,353 @@ const TimetableGrid = forwardRef(({ classId, className: classSectionName, onChan
             </DragOverlay>
         </DndContext>
     );
+});
+
+RealTimetableGrid.displayName = 'RealTimetableGrid';
+
+// Demo-only grid implementation that is fully in-memory and never calls the backend
+const DemoTimetableGrid = forwardRef(({ classId, className: classSectionName, onChange, hasUnsavedChanges }, ref) => {
+    const { demoTeachers, demoSubjects } = useDemo();
+
+    const [assignments, setAssignments] = useState(new Map());
+    const [activeId, setActiveId] = useState(null);
+    const [activeDragData, setActiveDragData] = useState(null);
+
+    // Expose getPeriods method to parent (same shape as real grid)
+    useImperativeHandle(ref, () => ({
+        getPeriods: () => {
+            const periods = {};
+            const daysFull = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+            assignments.forEach((assignment, slotId) => {
+                const [dayShort, periodStr] = slotId.split('-');
+                const dayIndex = DAYS_SHORT.indexOf(dayShort);
+                if (dayIndex === -1) return;
+
+                const day = daysFull[dayIndex];
+                const period = parseInt(periodStr);
+
+                if (!periods[day]) {
+                    periods[day] = [];
+                }
+
+                periods[day].push({
+                    period,
+                    subjectId: assignment.subjectId,
+                    teacherId: assignment.teacherId,
+                });
+            });
+
+            return periods;
+        },
+    }));
+
+    // Build simple teacher-subject pairs from demo data (round-robin assignment)
+    const teacherSubjectPairs = useMemo(() => {
+        if (!demoTeachers.length || !demoSubjects.length) return [];
+
+        return demoSubjects.map((subject, idx) => {
+            const teacher = demoTeachers[idx % demoTeachers.length];
+
+            return {
+                id: `${teacher.id}-${subject.id}`,
+                teacherId: teacher.id,
+                subjectId: subject.id,
+                teacherName: teacher.name,
+                subjectName: subject.name,
+                subjectShortName: subject.code || subject.name.slice(0, 4) || "N/A",
+                color: generateTeacherColor(teacher.name),
+                periodsRequired: subject.periods_per_week || 4,
+            };
+        });
+    }, [demoTeachers, demoSubjects]);
+
+    // Calculate entries and conflicts using client-side helper only (no backend)
+    const entries = useMemo(() => {
+        const result = [];
+        assignments.forEach((assignment, slotId) => {
+            const [day, periodStr] = slotId.split('-');
+            result.push({
+                slotId,
+                day,
+                period: parseInt(periodStr),
+                teacherId: assignment.teacherId,
+                subjectId: assignment.subjectId,
+            });
+        });
+        return result;
+    }, [assignments]);
+
+    const conflicts = useMemo(
+        () => detectConflicts(entries, classId, demoTeachers, demoSubjects),
+        [entries, classId, demoTeachers, demoSubjects]
+    );
+
+    const periodsAssigned = useMemo(() => {
+        const counts = new Map();
+        assignments.forEach((assignment) => {
+            const current = counts.get(assignment.subjectId) || 0;
+            counts.set(assignment.subjectId, current + 1);
+        });
+        return counts;
+    }, [assignments]);
+
+    const workingDays = DAYS_SHORT.slice(0, 5);
+    const periods = DEFAULT_PERIODS;
+
+    const handleDragStart = (event) => {
+        setActiveId(event.active.id);
+        setActiveDragData(event.active.data.current);
+    };
+
+    const handleDragEnd = (event) => {
+        const { active, over } = event;
+
+        setActiveId(null);
+        setActiveDragData(null);
+
+        if (!over || !active.data.current) return;
+
+        const dragData = active.data.current;
+        const slotId = over.id;
+        const [day, periodStr] = slotId.split('-');
+        const period = parseInt(periodStr);
+
+        if (over.data.current?.isBreak) return;
+
+        const newAssignment = {
+            teacherSubjectId: active.id,
+            teacherId: dragData.teacherId,
+            subjectId: dragData.subjectId,
+            teacherName: dragData.teacherName,
+            subjectName: dragData.subjectName,
+            subjectShortName: dragData.subjectShortName,
+            color: dragData.color,
+        };
+
+        setAssignments((prev) => {
+            const updated = new Map(prev);
+            updated.set(slotId, newAssignment);
+            return updated;
+        });
+
+        if (onChange) {
+            onChange();
+        }
+
+        toast.success('Period assigned (demo only)', {
+            description: `${dragData.subjectName} with ${dragData.teacherName}`,
+            icon: <CheckCircle className="w-4 h-4" />,
+        });
+    };
+
+    const handleRemoveAssignment = (slotId) => {
+        setAssignments((prev) => {
+            const updated = new Map(prev);
+            updated.delete(slotId);
+            return updated;
+        });
+
+        if (onChange) {
+            onChange();
+        }
+    };
+
+    if (!demoTeachers.length || !demoSubjects.length) {
+        return (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+                <AlertCircle className="w-12 h-12 text-muted-foreground mb-4" />
+                <h2 className="text-xl font-semibold text-foreground mb-2">Demo data not available</h2>
+                <p className="text-muted-foreground">Please refresh the page to reset demo mode.</p>
+            </div>
+        );
+    }
+
+    return (
+        <DndContext
+            collisionDetection={pointerWithin}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+        >
+            <div className="flex gap-6 h-full">
+                {/* Sidebar - Subjects to drag */}
+                <div className="w-72 shrink-0 bg-card rounded-2xl border border-border/50 p-4 overflow-y-auto">
+                    <div className="mb-4">
+                        <h3 className="font-semibold text-foreground">Demo Subjects & Teachers</h3>
+                        <p className="text-xs text-muted-foreground mt-1">Drag to assign to timetable (demo only)</p>
+                    </div>
+
+                    {teacherSubjectPairs.length === 0 ? (
+                        <div className="text-center py-8">
+                            <AlertCircle className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                            <p className="text-sm text-muted-foreground">No demo subjects configured.</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            {teacherSubjectPairs.map((ts) => (
+                                <DraggableSubject
+                                    key={ts.id}
+                                    id={ts.id}
+                                    teacherId={ts.teacherId}
+                                    subjectId={ts.subjectId}
+                                    teacherName={ts.teacherName}
+                                    subjectName={ts.subjectName}
+                                    subjectShortName={ts.subjectShortName}
+                                    color={ts.color}
+                                    periodsAssigned={periodsAssigned.get(ts.subjectId) || 0}
+                                    periodsRequired={ts.periodsRequired}
+                                    unavailableSlots={[]}
+                                />
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Conflict Summary (same UI but demo-only counts) */}
+                    {conflicts.length > 0 && (
+                        <div className="mt-6 p-3 rounded-xl bg-destructive/10 border border-destructive/20">
+                            <h4 className="text-sm font-medium text-destructive mb-2">
+                                {conflicts.filter((c) => c.severity === 'error').length} Conflicts
+                            </h4>
+                            <div className="space-y-1">
+                                {conflicts
+                                    .filter((c) => c.severity === 'error')
+                                    .slice(0, 3)
+                                    .map((conflict, i) => (
+                                        <p key={i} className="text-xs text-destructive/80">
+                                            {conflict.message}
+                                        </p>
+                                    ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {hasUnsavedChanges && (
+                        <div className="mt-4 p-3 rounded-xl bg-warning/10 border border-warning/20">
+                            <p className="text-xs text-warning-foreground">
+                                ⚠️ You have unsaved changes (demo only)
+                            </p>
+                        </div>
+                    )}
+                </div>
+
+                {/* Main Grid */}
+                <div className="flex-1 overflow-auto">
+                    <div className="bg-card rounded-2xl border border-border/50 p-4 min-w-[800px]">
+                        <div className="flex items-center justify-between mb-4">
+                            <div>
+                                <h2 className="text-lg font-semibold text-foreground">{classSectionName}</h2>
+                                <p className="text-sm text-muted-foreground">
+                                    {assignments.size} periods assigned • {conflicts.filter((c) => c.severity === 'error').length} conflicts
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <div className="w-3 h-3 rounded-full bg-destructive/50" />
+                                    <span>Conflict</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <div className="w-3 h-3 rounded-full bg-warning/50" />
+                                    <span>Warning</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="grid gap-2" style={{ gridTemplateColumns: `80px repeat(${workingDays.length}, 1fr)` }}>
+                            <div className="h-10" />
+                            {workingDays.map((day) => (
+                                <div
+                                    key={day}
+                                    className="h-10 flex items-center justify-center font-semibold text-sm text-foreground bg-muted/50 rounded-lg"
+                                >
+                                    {day}
+                                </div>
+                            ))}
+
+                            {periods.map((period, periodIndex) => (
+                                <div key={`row-${periodIndex}`} className="contents">
+                                    <div
+                                        key={`time-${periodIndex}`}
+                                        className={cn(
+                                            'flex flex-col items-center justify-center text-xs',
+                                            period.isBreak ? 'text-muted-foreground' : 'text-foreground'
+                                        )}
+                                    >
+                                        {period.isBreak ? (
+                                            <span className="font-medium">{period.label}</span>
+                                        ) : (
+                                            <>
+                                                <span className="font-semibold">P{period.number}</span>
+                                                <span className="text-muted-foreground">{period.start}</span>
+                                            </>
+                                        )}
+                                    </div>
+
+                                    {workingDays.map((day) => {
+                                        const periodNum = period.number || periodIndex;
+                                        const slotId = `${day}-${periodNum}`;
+                                        const assignment = assignments.get(slotId);
+                                        const slotStatus = getSlotStatus(slotId, conflicts);
+
+                                        return (
+                                            <DroppableSlot
+                                                key={slotId}
+                                                id={slotId}
+                                                day={day}
+                                                period={periodIndex}
+                                                isBreak={period.isBreak}
+                                                breakLabel={period.label}
+                                                data={assignment}
+                                                hasError={slotStatus.hasError}
+                                                hasWarning={slotStatus.hasWarning}
+                                                conflictMessages={slotStatus.messages}
+                                                unavailableTeachers={[]}
+                                                onRemove={() => handleRemoveAssignment(slotId)}
+                                            />
+                                        );
+                                    })}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <DragOverlay>
+                {activeId && activeDragData && (
+                    <div
+                        className="px-4 py-2 rounded-lg shadow-xl border-2 flex items-center gap-2"
+                        style={{
+                            backgroundColor: `${activeDragData.color}20`,
+                            borderColor: activeDragData.color,
+                        }}
+                    >
+                        <div
+                            className="w-8 h-8 rounded-md flex items-center justify-center text-xs font-bold text-primary-foreground"
+                            style={{ backgroundColor: activeDragData.color }}
+                        >
+                            {activeDragData.subjectShortName?.slice(0, 2)}
+                        </div>
+                        <div>
+                            <div className="text-sm font-medium" style={{ color: activeDragData.color }}>
+                                {activeDragData.subjectName}
+                            </div>
+                            <div className="text-xs text-muted-foreground">{activeDragData.teacherName}</div>
+                        </div>
+                    </div>
+                )}
+            </DragOverlay>
+        </DndContext>
+    );
+});
+
+DemoTimetableGrid.displayName = 'DemoTimetableGrid';
+
+// Wrapper that selects real or demo grid based on isDemoMode flag
+const TimetableGrid = forwardRef(({ isDemoMode = false, ...props }, ref) => {
+    if (isDemoMode) {
+        return <DemoTimetableGrid ref={ref} {...props} />;
+    }
+    return <RealTimetableGrid ref={ref} {...props} />;
 });
 
 TimetableGrid.displayName = 'TimetableGrid';

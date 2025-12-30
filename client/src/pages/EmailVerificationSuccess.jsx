@@ -64,3 +64,11 @@ const EmailVerificationSuccess = () => {
 
 export default EmailVerificationSuccess;
 
+
+
+
+
+
+
+
+
