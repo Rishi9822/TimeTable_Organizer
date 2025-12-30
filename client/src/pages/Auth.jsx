@@ -27,8 +27,10 @@ import {
 } from "@/components/ui/select";
 
 import { useToast } from "@/hooks/useToast";
-import { Calendar, Loader2, Eye, EyeOff } from "lucide-react";
+import { Calendar, Loader2, Eye, EyeOff, Mail, AlertCircle } from "lucide-react";
 import { z } from "zod";
+import API from "@/lib/api";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 /* ======================
    VALIDATION SCHEMAS
@@ -44,8 +46,10 @@ const Auth = () => {
     role,
     institutionId,
     isSetupComplete,
+    emailVerified,
     signIn,
     signUp,
+    refreshUserData,
     loading,
   } = useAuth();
 
@@ -54,6 +58,8 @@ const Auth = () => {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showVerificationMessage, setShowVerificationMessage] = useState(false);
+  const [resendingVerification, setResendingVerification] = useState(false);
 
   /* LOGIN */
   const [loginEmail, setLoginEmail] = useState("");
@@ -90,10 +96,34 @@ const Auth = () => {
   };
 
   useEffect(() => {
-    if (user && !loading && role) {
-      navigate(getRedirectPath(), { replace: true });
+    // Check for verification success or error in URL params (only once on mount)
+    const urlParams = new URLSearchParams(window.location.search);
+    const error = urlParams.get("error");
+    if (error === "invalid_token" || error === "invalid_or_expired_token") {
+      toast({
+        title: "Verification Failed",
+        description: "The verification link is invalid or has expired.",
+        variant: "destructive",
+      });
+      // Clean up URL
+      window.history.replaceState({}, "", "/auth");
     }
-  }, [user, loading, role, institutionId, isSetupComplete, navigate]);
+  }, []); // Only run once on mount
+
+  useEffect(() => {
+    // Handle redirects for authenticated users
+    // Note: Unverified users can still access the app (backward compatibility)
+    // They'll see a warning banner but can proceed
+    if (user && !loading && role) {
+      // Allow unverified users to stay on auth page to see verification message
+      // But if they're verified, redirect them away from auth page
+      if (emailVerified) {
+        navigate(getRedirectPath(), { replace: true });
+      }
+      // If not verified, let ProtectedRoute handle the redirect logic
+      // This allows existing users to continue working
+    }
+  }, [user, loading, role, institutionId, isSetupComplete, emailVerified, navigate]);
 
   /* ======================
      LOGIN HANDLER
@@ -123,6 +153,9 @@ const Auth = () => {
         description: error.message || "Invalid email or password.",
         variant: "destructive",
       });
+    } else {
+      // Check if email is verified after successful login
+      await refreshUserData();
     }
   };
 
@@ -178,10 +211,54 @@ const Auth = () => {
         variant: "destructive",
       });
     } else {
+      setShowVerificationMessage(true);
       toast({
         title: "Account Created",
-        description: "Welcome! You are now signed in.",
+        description: "Please verify your email to activate your account.",
       });
+    }
+  };
+
+  /* ======================
+     RESEND VERIFICATION EMAIL
+  ====================== */
+  const handleResendVerification = async () => {
+    const emailToResend = user?.email || loginEmail || signupEmail;
+    
+    if (!emailToResend) {
+      toast({
+        title: "Error",
+        description: "Please enter your email address",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      emailSchema.parse(emailToResend);
+    } catch {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a valid email address",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setResendingVerification(true);
+    try {
+      await API.post("/auth/resend-verification", { email: emailToResend });
+      toast({
+        title: "Verification Email Sent",
+        description: "Please check your inbox for the verification link.",
+      });
+    } catch (error) {
+      toast({
+        title: "Email Sent",
+        description: "If an account exists, a verification email has been sent.",
+      });
+    } finally {
+      setResendingVerification(false);
     }
   };
 
@@ -226,6 +303,23 @@ const Auth = () => {
 
             {/* LOGIN */}
             <TabsContent value="login">
+              {user && !emailVerified && (
+                <Alert className="mb-4 border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20">
+                  <AlertCircle className="h-4 w-4 text-yellow-600" />
+                  <AlertTitle className="text-yellow-800 dark:text-yellow-200">Email Not Verified</AlertTitle>
+                  <AlertDescription className="text-yellow-700 dark:text-yellow-300">
+                    Please verify your email address to access all features.{" "}
+                    <button
+                      type="button"
+                      onClick={handleResendVerification}
+                      disabled={resendingVerification}
+                      className="underline font-medium hover:no-underline"
+                    >
+                      {resendingVerification ? "Sending..." : "Resend verification email"}
+                    </button>
+                  </AlertDescription>
+                </Alert>
+              )}
               <form onSubmit={handleLogin} className="space-y-4">
                 <div>
                   <Label htmlFor="login-email">Email</Label>
@@ -280,11 +374,38 @@ const Auth = () => {
                 >
                   {isSubmitting ? "Signing in..." : "Sign In"}
                 </Button>
+                
+                <div className="text-center">
+                  <button
+                    type="button"
+                    onClick={() => navigate("/auth/forgot-password")}
+                    className="text-sm text-muted-foreground hover:text-primary underline"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
               </form>
             </TabsContent>
 
             {/* SIGNUP */}
             <TabsContent value="signup">
+              {showVerificationMessage && (
+                <Alert className="mb-4 border-blue-500 bg-blue-50 dark:bg-blue-900/20">
+                  <Mail className="h-4 w-4 text-blue-600" />
+                  <AlertTitle className="text-blue-800 dark:text-blue-200">Verification Email Sent</AlertTitle>
+                  <AlertDescription className="text-blue-700 dark:text-blue-300">
+                    Please check your email and click the verification link to activate your account.{" "}
+                    <button
+                      type="button"
+                      onClick={handleResendVerification}
+                      disabled={resendingVerification}
+                      className="underline font-medium hover:no-underline"
+                    >
+                      {resendingVerification ? "Sending..." : "Resend email"}
+                    </button>
+                  </AlertDescription>
+                </Alert>
+              )}
               <form onSubmit={handleSignup} className="space-y-4" noValidate>
                 <div>
                   <Label htmlFor="signup-name">Full Name</Label>

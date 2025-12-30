@@ -18,6 +18,9 @@ import AdminDashboard from "@/pages/AdminDashboard";
 import UserDashboard from "@/pages/UserDashboard";
 import JoinInstitution from "@/pages/JoinInstitution";
 import Auth from "@/pages/Auth";
+import ForgotPassword from "@/pages/ForgotPassword";
+import ResetPassword from "@/pages/ResetPassword";
+import EmailVerificationSuccess from "@/pages/EmailVerificationSuccess";
 import NotFound from "@/pages/NotFound";
 import ActivityLog from "@/pages/ActivityLog";
 
@@ -45,6 +48,9 @@ const App = () => {
                   {/* Public */}
                   <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<Auth />} />
+                  <Route path="/auth/forgot-password" element={<ForgotPassword />} />
+                  <Route path="/auth/reset-password" element={<ResetPassword />} />
+                  <Route path="/auth/verify-email-success" element={<EmailVerificationSuccess />} />
 
                   {/* Admin */}
                   <Route

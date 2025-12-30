@@ -28,6 +28,18 @@ const userSchema = new mongoose.Schema(
       default: null,
     },
 
+    // Email verification fields
+    emailVerified: {
+      type: Boolean,
+      default: false,
+    },
+    emailVerificationToken: String,
+    emailVerificationExpires: Date,
+
+    // Password reset fields
+    passwordResetToken: String,
+    passwordResetExpires: Date,
+
     // isSetupComplete: {
     //   type: Boolean,
     //   default: false,

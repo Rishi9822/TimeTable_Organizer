@@ -9,6 +9,7 @@ export const ProtectedRoute = ({ children, requiredRoles }) => {
     role,
     institutionId,
     isSetupComplete,
+    emailVerified,
     loading,
     hasRole,
   } = useAuth();
@@ -36,7 +37,9 @@ export const ProtectedRoute = ({ children, requiredRoles }) => {
   }
 
   // If user is authenticated and tries to access /auth, redirect to appropriate dashboard
-  if (user && currentPath === "/auth") {
+  // BUT: Allow unverified users to stay on /auth to see verification message
+  // This is for backward compatibility - existing users can still use the app
+  if (user && currentPath === "/auth" && emailVerified) {
     if (role === "admin") {
       if (!institutionId || !isSetupComplete) {
         return <Navigate to="/setup" replace />;
@@ -54,6 +57,8 @@ export const ProtectedRoute = ({ children, requiredRoles }) => {
     }
     return <Navigate to="/" replace />;
   }
+  // If user is not verified but authenticated, allow them to access /auth
+  // They'll see the verification warning banner
 
   // 3️⃣ ADMIN FLOW
   if (role === "admin") {
