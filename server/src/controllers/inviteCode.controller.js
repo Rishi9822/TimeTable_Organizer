@@ -13,7 +13,10 @@ export const getInviteCodes = async (req, res) => {
       });
     }
 
-    const codes = await InviteCode.find({ institutionId }).sort({
+    const codes = await InviteCode.find({
+      institutionId,
+      isActive: true,
+    }).sort({
       createdAt: -1,
     });
     res.json(codes);
@@ -25,7 +28,15 @@ export const getInviteCodes = async (req, res) => {
 /* CREATE code */
 export const createInviteCode = async (req, res) => {
   try {
-    const { institutionId, maxUses } = req.body;
+    // CRITICAL: Enforce email verification requirement
+    if (!req.user.emailVerified) {
+      return res.status(403).json({ 
+        message: "Please verify your email address before creating invite codes. Check your inbox for the verification link.",
+        requiresEmailVerification: true 
+      });
+    }
+
+    const { institutionId, maxUses, code: requestedCode } = req.body;
 
     // Ensure admin can only create codes for their own institution
     if (req.user.institutionId?.toString() !== institutionId?.toString()) {
@@ -34,7 +45,10 @@ export const createInviteCode = async (req, res) => {
       });
     }
 
-    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+    // Allow optional client-provided code, but normalize and validate it.
+    let code = requestedCode
+      ? String(requestedCode).toUpperCase().trim()
+      : Math.random().toString(36).substring(2, 8).toUpperCase();
 
     const invite = await InviteCode.create({
       institutionId: req.user.institutionId,
@@ -54,6 +68,13 @@ export const createInviteCode = async (req, res) => {
 
     res.status(201).json(invite);
   } catch (error) {
+    // Handle duplicate code errors gracefully
+    if (error?.code === 11000) {
+      return res.status(400).json({
+        message: "Invite code already exists. Please try generating a new code.",
+      });
+    }
+
     res.status(400).json({ message: error.message });
   }
 };
@@ -75,13 +96,12 @@ export const deleteInviteCode = async (req, res) => {
       });
     }
 
-    // Delete by _id AND institutionId for multi-tenant safety
-    await InviteCode.findOneAndDelete({
-      _id: id,
-      institutionId: req.user.institutionId,
-    });
+    // Soft delete: mark invite code as inactive (do not remove the document)
+    inviteCode.isActive = false;
+    inviteCode.expiresAt = inviteCode.expiresAt || new Date();
+    await inviteCode.save();
 
-    // Audit log: Log AFTER successful deletion
+    // Audit log: Log AFTER successful soft deletion
     logAuditFromRequest(
       req,
       "DELETE_INVITE_CODE",

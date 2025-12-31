@@ -149,40 +149,39 @@ export const InstitutionProvider = ({ children }) => {
   ]);
 
   const completeSetup = useCallback(async () => {
-  if (!user) throw new Error("User not authenticated");
+    if (!user) throw new Error("User not authenticated");
 
-  generatePeriods();
+    // Ensure periods are generated locally for downstream UI usage
+    generatePeriods();
 
-  let finalInstitutionId = institutionId;
-
-  if (!institutionId) {
-    const res = await api.post("/institutions", {
+    // Always call backend setup endpoint to mark Institution.isSetupComplete = true
+    // This works for both new institutions (create) and existing ones (update).
+    const setupResponse = await api.post("/institutions", {
       institutionName: config.institutionName || "My Institution",
     });
 
-    finalInstitutionId = res.data.institutionId;
-  }
+    const finalInstitutionId = setupResponse.data?.institutionId;
 
-  await upsertSettings.mutateAsync({
-    institution_id: finalInstitutionId,
-    institution_name: config.institutionName,
-    institution_type: config.institutionType,
-    working_days: config.workingDays,
-    periods_per_day: config.periodsPerDay,
-    period_duration: config.periodDuration,
-    start_time: config.startTime,
-    lab_duration: config.labDuration,
-    breaks: config.breaks,
-  });
+    // Persist detailed scheduling settings; backend derives institutionId from authenticated user.
+    await upsertSettings.mutateAsync({
+      institution_id: finalInstitutionId,
+      institution_name: config.institutionName,
+      institution_type: config.institutionType,
+      working_days: config.workingDays,
+      periods_per_day: config.periodsPerDay,
+      period_duration: config.periodDuration,
+      start_time: config.startTime,
+      lab_duration: config.labDuration,
+      breaks: config.breaks,
+    });
 
-  return true;
-}, [
-  user,
-  institutionId,
-  config,
-  generatePeriods,
-  upsertSettings,
-]);
+    return true;
+  }, [
+    user,
+    config,
+    generatePeriods,
+    upsertSettings,
+  ]);
 
 
   return (

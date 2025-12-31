@@ -29,9 +29,10 @@ import { UserMenu } from '@/components/auth/UserMenu';
 import { useClasses } from '@/hooks/useTeachers';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTimetableContext } from '@/contexts/TimetableContext';
+import { useDemo } from '@/contexts/DemoContext';
 import { toast } from 'sonner';
 
-const TimetableBuilder = () => {
+const RealTimetableBuilder = () => {
   const { hasRole } = useAuth();
   const { data: classes = [] } = useClasses();
   const { loadTimetable, loadAllTimetables, saveTimetable, isLoading, isSaving } = useTimetableContext();
@@ -290,6 +291,170 @@ const TimetableBuilder = () => {
       </AlertDialog>
     </div>
   );
+};
+
+// Demo variant: uses DemoContext classes and fully in-memory TimetableGrid (no backend writes)
+const DemoTimetableBuilder = () => {
+  const { demoClasses, maxDemoClasses } = useDemo();
+
+  const [selectedClassId, setSelectedClassId] = useState(
+    demoClasses[0]?.id || ''
+  );
+  const [selectedClassName, setSelectedClassName] = useState(
+    demoClasses[0]?.name || ''
+  );
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [pendingClassSwitch, setPendingClassSwitch] = useState(null);
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  const timetableRef = useRef(null);
+
+  useEffect(() => {
+    if (demoClasses.length > 0 && !selectedClassId) {
+      const first = demoClasses[0];
+      setSelectedClassId(first.id);
+      setSelectedClassName(first.name);
+    }
+  }, [demoClasses, selectedClassId]);
+
+  const handleSelectClass = (classId, className, skipCheck = false) => {
+    if (!skipCheck && hasUnsavedChanges) {
+      setPendingClassSwitch({ classId, className });
+      setShowUnsavedDialog(true);
+      return;
+    }
+    setSelectedClassId(classId);
+    setSelectedClassName(className);
+    setHasUnsavedChanges(false);
+  };
+
+  const handleConfirmSwitch = () => {
+    if (pendingClassSwitch) {
+      setSelectedClassId(pendingClassSwitch.classId);
+      setSelectedClassName(pendingClassSwitch.className);
+      setHasUnsavedChanges(false);
+      setPendingClassSwitch(null);
+    }
+    setShowUnsavedDialog(false);
+  };
+
+  const handleCancelSwitch = () => {
+    setPendingClassSwitch(null);
+    setShowUnsavedDialog(false);
+  };
+
+  const handleTimetableChange = () => {
+    setHasUnsavedChanges(true);
+  };
+
+  const handleSaveDemo = async () => {
+    // No backend writes in demo; just clear unsaved flag
+    setHasUnsavedChanges(false);
+    toast.info('Changes are kept only for this session in demo mode.', {
+      icon: <AlertCircle className="w-4 h-4" />,
+    });
+  };
+
+  const selectedClass = demoClasses.find((c) => c.id === selectedClassId);
+
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border/50">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-2"
+                asChild
+              >
+                <Link to="/demo">
+                  <ArrowLeft className="w-4 h-4" />
+                  <span className="hidden sm:inline">Back to Demo</span>
+                </Link>
+              </Button>
+              <div className="h-6 w-px bg-border" />
+              <div>
+                <h1 className="text-lg font-semibold text-foreground">Timetable Builder (Demo)</h1>
+                <p className="text-xs text-muted-foreground hidden sm:block">
+                  Drag and drop to explore the timetable experience. Changes are not saved.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled
+                className="hidden sm:flex gap-2"
+              >
+                <Download className="w-4 h-4" />
+                Export (demo only)
+              </Button>
+              <Button
+                variant="hero"
+                size="sm"
+                onClick={handleSaveDemo}
+                disabled={!hasUnsavedChanges}
+                className="gap-2"
+              >
+                <Save className="w-4 h-4" />
+                Save (Session)
+              </Button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {selectedClassId ? (
+          <TimetableGrid
+            ref={timetableRef}
+            isDemoMode={true}
+            classId={selectedClassId}
+            className={selectedClass?.name || selectedClassId}
+            onSave={handleSaveDemo}
+            onChange={handleTimetableChange}
+            hasUnsavedChanges={hasUnsavedChanges}
+          />
+        ) : (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <AlertCircle className="w-12 h-12 text-muted-foreground mb-4" />
+            <h2 className="text-xl font-semibold text-foreground mb-2">No demo classes available</h2>
+            <p className="text-muted-foreground">
+              Use the demo start screen to create sample classes.
+            </p>
+          </div>
+        )}
+      </main>
+
+      <AlertDialog open={showUnsavedDialog} onOpenChange={setShowUnsavedDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes to the timetable for {selectedClassName}. 
+              Do you want to discard them and switch classes?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleCancelSwitch}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmSwitch}>
+              Switch Without Saving
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+};
+
+const TimetableBuilder = ({ isDemoMode = false }) => {
+  if (isDemoMode) {
+    return <DemoTimetableBuilder />;
+  }
+  return <RealTimetableBuilder />;
 };
 
 export default TimetableBuilder;

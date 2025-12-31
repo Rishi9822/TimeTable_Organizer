@@ -23,6 +23,7 @@ export const AuthProvider = ({ children }) => {
   const [role, setRole] = useState(null);
   const [institutionId, setInstitutionId] = useState(null);
   const [isSetupComplete, setIsSetupComplete] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(false);
   const [loading, setLoading] = useState(true);
 
 
@@ -40,13 +41,15 @@ export const AuthProvider = ({ children }) => {
         setUser(data.user);
         setRole(data.user.role);
         setInstitutionId(data.user.institutionId || null);
-setIsSetupComplete(Boolean(data.user.isSetupComplete));
+        setIsSetupComplete(Boolean(data.user.isSetupComplete));
+        setEmailVerified(Boolean(data.user.emailVerified));
       } catch {
         localStorage.removeItem("token");
         setUser(null);
         setRole(null);
         setInstitutionId(null);
         setIsSetupComplete(false);
+        setEmailVerified(false);
 
       } finally {
         setLoading(false);
@@ -72,6 +75,7 @@ setIsSetupComplete(Boolean(data.user.isSetupComplete));
       setRole(res.data.user.role);
       setInstitutionId(res.data.user.institutionId || null);
       setIsSetupComplete(!!res.data.user.isSetupComplete);
+      setEmailVerified(!!res.data.user.emailVerified);
 
       return { error: null };
     } catch (error) {
@@ -91,6 +95,7 @@ setIsSetupComplete(Boolean(data.user.isSetupComplete));
       setRole(res.data.user.role);
       setInstitutionId(res.data.user.institutionId || null);
       setIsSetupComplete(!!res.data.user.isSetupComplete);
+      setEmailVerified(!!res.data.user.emailVerified);
 
       return { error: null };
     } catch (error) {
@@ -107,6 +112,7 @@ setIsSetupComplete(Boolean(data.user.isSetupComplete));
     setRole(null);
     setInstitutionId(null);
     setIsSetupComplete(false);
+    setEmailVerified(false);
 
   };
 
@@ -118,6 +124,7 @@ setIsSetupComplete(Boolean(data.user.isSetupComplete));
     setRole(data.user.role);
     setInstitutionId(data.user.institutionId || null);
     setIsSetupComplete(!!data.user.isSetupComplete);
+    setEmailVerified(!!data.user.emailVerified);
   } catch {
     signOut();
   }
@@ -142,6 +149,7 @@ setIsSetupComplete(Boolean(data.user.isSetupComplete));
     role,
     institutionId,
     isSetupComplete,
+    emailVerified,
     loading,
     signUp,
     signIn,

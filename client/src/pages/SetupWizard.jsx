@@ -18,6 +18,9 @@ import { useInstitutionContext } from "@/contexts/InstitutionContext";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle, Mail } from "lucide-react";
+import API from "@/lib/api";
 
 
 const DAYS = [
@@ -34,11 +37,36 @@ const SetupWizard = () => {
 
   const navigate = useNavigate();
   const { config, updateConfig, completeSetup, isLoading } = useInstitutionContext();
-  const { refreshUserData } = useAuth();
+  const { refreshUserData, emailVerified, user } = useAuth();
+  const email = user?.email;
 
   const [step, setStep] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
+  const [resendingVerification, setResendingVerification] = useState(false);
   const totalSteps = 4;
+
+  const handleResendVerification = async () => {
+    if (!email) {
+      toast.error("Error", {
+        description: "Email address not found",
+      });
+      return;
+    }
+
+    setResendingVerification(true);
+    try {
+      await API.post("/auth/resend-verification", { email });
+      toast.success("Verification email sent", {
+        description: "Please check your inbox for the verification link.",
+      });
+    } catch (error) {
+      toast.success("Email sent", {
+        description: "If an account exists, a verification email has been sent.",
+      });
+    } finally {
+      setResendingVerification(false);
+    }
+  };
 
   const handleNext = () => {
     if (step < totalSteps) setStep(step + 1);
@@ -49,6 +77,14 @@ const SetupWizard = () => {
   };
 
   const handleComplete = async () => {
+    // CRITICAL: Block completion if email is not verified (backend also enforces this)
+    if (!emailVerified) {
+      toast.error("Email verification required", {
+        description: "Please verify your email address before completing setup. Check your inbox for the verification link.",
+      });
+      return;
+    }
+
     setIsSaving(true);
     try {
       await completeSetup();
@@ -64,8 +100,9 @@ const SetupWizard = () => {
       // 🔥 FORCE redirect after state sync
       window.location.replace("/admin");
     } catch (error) {
+      const errorMessage = error?.response?.data?.message || error?.message || "Please try again.";
       toast.error("Failed to save settings", {
-        description: error?.message || "Please try again.",
+        description: errorMessage,
       });
     } finally {
       setIsSaving(false);
@@ -166,6 +203,25 @@ const SetupWizard = () => {
             <span>Review</span>
           </div>
         </div>
+
+        {/* Email Verification Warning Banner */}
+        {!emailVerified && (
+          <Alert className="mb-6 border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20">
+            <Mail className="h-4 w-4 text-yellow-600" />
+            <AlertTitle className="text-yellow-800 dark:text-yellow-200">Email Verification Required</AlertTitle>
+            <AlertDescription className="text-yellow-700 dark:text-yellow-300">
+              Please verify your email address to complete institution setup. Check your inbox for the verification link.{" "}
+              <button
+                type="button"
+                onClick={handleResendVerification}
+                disabled={resendingVerification}
+                className="underline font-medium hover:no-underline"
+              >
+                {resendingVerification ? "Sending..." : "Resend verification email"}
+              </button>
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Card container */}
         <div className="bg-card rounded-2xl border border-border/50 shadow-xl p-6 sm:p-8">
@@ -487,7 +543,7 @@ const SetupWizard = () => {
               <Button
                 variant="hero"
                 onClick={handleComplete}
-                disabled={isSaving}
+                disabled={isSaving || !emailVerified}
                 className="gap-2"
               >
                 <CheckCircle className="w-4 h-4" />

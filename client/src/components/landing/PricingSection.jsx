@@ -1,59 +1,83 @@
 import { Button } from "@/components/ui/button";
 import { Check, Sparkles, Building, Crown } from "lucide-react";
+import { Link } from "react-router-dom";
 
+// Pricing is purely illustrative; backend remains source of truth for plans.
+// Plans here mirror the SaaS rules: Demo, Trial, Standard, Flex.
 const plans = [
   {
-    name: "Free",
-    description: "For small institutions getting started",
-    price: "₹0",
-    period: "forever",
+    name: "Demo",
+    badge: "No signup",
+    description: "Try the timetable builder instantly with sample data.",
+    price: "Free",
+    period: "in-browser",
     icon: Sparkles,
     features: [
-      "Up to 3 classes",
-      "Basic conflict detection",
-      "Manual scheduling",
-      "1 admin user",
-      "Community support",
+      "No signup required",
+      "In-memory only (no database writes)",
+      "Up to 2 demo classes",
+      "Hardcoded demo teachers & subjects",
+      "Drag & drop builder with conflicts",
     ],
-    cta: "Get Started",
+    cta: "Try Demo",
+    to: "/demo",
     variant: "heroOutline",
     popular: false,
   },
   {
-    name: "Pro",
-    description: "For schools and colleges",
-    price: "₹2,999",
-    period: "per month",
+    name: "Trial",
+    badge: "After signup",
+    description: "Evaluate TimetablePro with your own institution.",
+    price: "Free",
+    period: "7–14 days",
     icon: Building,
     features: [
-      "Unlimited classes",
-      "Advanced conflict prevention",
-      "Smart slot suggestions",
-      "5 admin users",
-      "PDF & Excel export",
-      "Teacher-wise views",
-      "Priority support",
+      "Limited classes & teachers",
+      "No exports",
+      "Institution setup wizard",
+      "Institution type locked (School OR College)",
+      "Upgrade-ready to paid plans",
     ],
     cta: "Start Free Trial",
+    to: "/auth",
     variant: "hero",
     popular: true,
   },
   {
-    name: "Enterprise",
-    description: "For large institutions & SaaS",
-    price: "Custom",
-    period: "contact us",
+    name: "Standard",
+    badge: "Paid",
+    description: "For single-mode schools or colleges.",
+    price: "Unlimited",
+    period: "usage",
     icon: Crown,
     features: [
-      "Everything in Pro",
-      "AI-powered optimization",
-      "Multi-branch support",
-      "SSO & advanced security",
-      "Custom integrations",
-      "Dedicated account manager",
-      "SLA guarantee",
+      "Unlimited classes & teachers",
+      "All core features enabled",
+      "Institution locked to School OR College",
+      "PDF / Excel exports (when enabled)",
+      "Priority support",
     ],
-    cta: "Contact Sales",
+    cta: "Upgrade inside app",
+    to: "/auth",
+    variant: "heroOutline",
+    popular: false,
+  },
+  {
+    name: "Flex",
+    badge: "Paid",
+    description: "For hybrid institutions that switch modes.",
+    price: "Unlimited",
+    period: "usage",
+    icon: Crown,
+    features: [
+      "Everything in Standard",
+      "Switch School 304 College",
+      "Maintain multiple configs",
+      "Ideal for coaching & hybrid setups",
+      "Best for multi-branch SaaS",
+    ],
+    cta: "Upgrade inside app",
+    to: "/auth",
     variant: "heroOutline",
     popular: false,
   },
@@ -73,11 +97,11 @@ const PricingSection = () => {
           </div>
 
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-foreground mb-6">
-            Choose Your Plan
+            Plans for every stage
           </h2>
 
           <p className="text-lg text-muted-foreground">
-            Start free and scale as you grow. No hidden fees, cancel anytime.
+            Start in demo, move to trial after signup, and upgrade to Standard or Flex when you are ready.
           </p>
         </div>
 
@@ -115,9 +139,16 @@ const PricingSection = () => {
                     }`}
                   />
                 </div>
-                <h3 className="text-xl font-semibold text-foreground">
-                  {plan.name}
-                </h3>
+                <div>
+                  <h3 className="text-xl font-semibold text-foreground">
+                    {plan.name}
+                  </h3>
+                  {plan.badge && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {plan.badge}
+                    </p>
+                  )}
+                </div>
               </div>
 
               <p className="text-muted-foreground mb-6">
@@ -142,8 +173,10 @@ const PricingSection = () => {
                 ))}
               </ul>
 
-              <Button variant={plan.variant} size="lg" className="w-full">
-                {plan.cta}
+              <Button variant={plan.variant} size="lg" className="w-full" asChild>
+                <Link to={plan.to}>
+                  {plan.cta}
+                </Link>
               </Button>
             </div>
           ))}

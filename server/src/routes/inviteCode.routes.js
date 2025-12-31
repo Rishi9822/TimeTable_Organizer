@@ -1,6 +1,7 @@
 import express from "express";
 import authMiddleware from "../middleware/authMiddleware.js";
 import { requireRole } from "../middleware/roleMiddleware.js";
+import { requireWritableInstitution } from "../middleware/institutionStatusMiddleware.js";
 import {
   getInviteCodes,
   createInviteCode,
@@ -28,6 +29,7 @@ router.post(
   "/invite-codes",
   authMiddleware,
   requireRole(["admin"]),
+  requireWritableInstitution,
   createInviteCode
 );
 
@@ -40,6 +42,7 @@ router.delete(
   "/invite-codes/:id",
   authMiddleware,
   requireRole(["admin"]),
+  requireWritableInstitution,
   deleteInviteCode
 );
 

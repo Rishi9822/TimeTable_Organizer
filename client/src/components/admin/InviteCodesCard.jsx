@@ -45,31 +45,24 @@ const InviteCodesCard = () => {
     fetchCodes();
   }, [institutionId]);
 
-  const generateCode = () => {
-    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-    let code = "";
-    for (let i = 0; i < 6; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return code;
-  };
-
   const handleGenerateCode = async () => {
     if (!institutionId || !user) return;
 
     setIsGenerating(true);
-    const newCode = generateCode();
 
     try {
-      await API.post("/institutions/invite-codes", {
+      const res = await API.post("/institutions/invite-codes", {
         institutionId,
-        code: newCode,
         maxUses: maxUses > 0 ? maxUses : null,
       });
 
+      const createdCode = res.data?.code;
+
       toast({
         title: "Code Generated!",
-        description: `Invite code ${newCode} has been created.`,
+        description: createdCode
+          ? `Invite code ${createdCode} has been created.`
+          : "A new invite code has been created.",
       });
 
       await fetchCodes();

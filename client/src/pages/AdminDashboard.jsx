@@ -10,6 +10,9 @@ import {
 import { UserMenu } from "@/components/auth/UserMenu";
 import { useAuth } from "@/contexts/AuthContext";
 import InviteCodesCard from "@/components/admin/InviteCodesCard";
+import { InstitutionStatusBanner } from "@/components/admin/InstitutionStatusBanner";
+import { InstitutionPlanCard } from "@/components/admin/InstitutionPlanCard";
+import { PlanUpgradeActions } from "@/components/admin/PlanUpgradeActions";
 import {
   Calendar,
   Users,
@@ -57,6 +60,9 @@ const AdminDashboard = () => {
             What would you like to do today?
           </p>
         </div>
+
+        {/* Institution Status Banner */}
+        <InstitutionStatusBanner />
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {/* Timetable Builder */}
@@ -140,6 +146,12 @@ const AdminDashboard = () => {
 
           {/* Invite Codes */}
           <InviteCodesCard />
+
+          {/* Plan & Status */}
+          <InstitutionPlanCard />
+
+          {/* Plan Upgrade Actions */}
+          <PlanUpgradeActions />
 
           {/* Activity Log */}
           <Card>

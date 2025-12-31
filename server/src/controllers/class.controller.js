@@ -1,5 +1,7 @@
 import Class from "../models/Class.js";
+import Institution from "../models/Institution.js";
 import { logAuditFromRequest } from "../utils/auditLogger.js";
+import { hasReachedClassLimit, getPlanLimits } from "../utils/planLimits.js";
 
 export const getClasses = async (req, res) => {
   try {
@@ -31,6 +33,27 @@ export const createClass = async (req, res) => {
         message: "You must be part of an institution to create classes",
       });
     }
+
+    // Check plan limits (only for trial plan, paid plans have no limits)
+    const institution = await Institution.findById(req.user.institutionId);
+    if (institution && institution.plan === "trial") {
+      // Only enforce limits for trial plan
+      const currentClassCount = await Class.countDocuments({
+        institutionId: req.user.institutionId,
+      });
+
+      if (hasReachedClassLimit(institution.plan, currentClassCount)) {
+        const limits = getPlanLimits(institution.plan);
+        return res.status(403).json({
+          message: `You have reached the maximum number of classes (${limits.maxClasses}) for your trial plan. Please upgrade your plan to add more classes.`,
+          limitReached: true,
+          currentCount: currentClassCount,
+          maxAllowed: limits.maxClasses,
+          plan: institution.plan,
+        });
+      }
+    }
+    // Paid plans (standard/flex) have unlimited classes - no check needed
 
     // CRITICAL: Force institutionId from authenticated user
     const cls = await Class.create({

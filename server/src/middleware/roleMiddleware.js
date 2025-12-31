@@ -11,7 +11,17 @@ export const requireRole = (allowedRoles) => {
     const userRole = req.user.role;
     const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
 
-    // Admins have access to everything
+    // For privileged admin/scheduler routes, enforce email verification
+    const requiresPrivilegedRole = roles.includes("admin") || roles.includes("scheduler");
+    if (requiresPrivilegedRole && !req.user.emailVerified) {
+      return res.status(403).json({
+        message:
+          "Please verify your email address before accessing this resource. Check your inbox for the verification link.",
+        requiresEmailVerification: true,
+      });
+    }
+
+    // Admins have access to everything (after verification check above)
     if (userRole === "admin") {
       return next();
     }

@@ -7,10 +7,12 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { TimetableProvider } from "@/contexts/TimetableContext";
 import { InstitutionProvider } from "@/contexts/InstitutionContext";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { DemoProvider } from "@/contexts/DemoContext";
 
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 
 import Index from "@/pages/Index";
+import DemoMode from "@/pages/DemoMode";
 import TimetableBuilder from "@/pages/TimetableBuilder";
 import SetupWizard from "@/pages/SetupWizard";
 import TeacherManagement from "@/pages/TeacherManagement";
@@ -18,6 +20,10 @@ import AdminDashboard from "@/pages/AdminDashboard";
 import UserDashboard from "@/pages/UserDashboard";
 import JoinInstitution from "@/pages/JoinInstitution";
 import Auth from "@/pages/Auth";
+import ForgotPassword from "@/pages/ForgotPassword";
+import ResetPassword from "@/pages/ResetPassword";
+import EmailVerificationSuccess from "@/pages/EmailVerificationSuccess";
+import EmailVerificationProcessing from "@/pages/EmailVerificationProcessing";
 import NotFound from "@/pages/NotFound";
 import ActivityLog from "@/pages/ActivityLog";
 
@@ -44,7 +50,19 @@ const App = () => {
                 <Routes>
                   {/* Public */}
                   <Route path="/" element={<Index />} />
+                  <Route
+                    path="/demo"
+                    element={
+                      <DemoProvider>
+                        <DemoMode />
+                      </DemoProvider>
+                    }
+                  />
                   <Route path="/auth" element={<Auth />} />
+                  <Route path="/auth/forgot-password" element={<ForgotPassword />} />
+                  <Route path="/auth/reset-password" element={<ResetPassword />} />
+                  <Route path="/auth/verify-email" element={<EmailVerificationProcessing />} />
+                  <Route path="/auth/verify-email-success" element={<EmailVerificationSuccess />} />
 
                   {/* Admin */}
                   <Route

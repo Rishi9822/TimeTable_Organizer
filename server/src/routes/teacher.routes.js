@@ -1,6 +1,7 @@
 import express from "express";
 import authMiddleware from "../middleware/authMiddleware.js";
 import { requireRole } from "../middleware/roleMiddleware.js";
+import { requireWritableInstitution } from "../middleware/institutionStatusMiddleware.js";
 import {
   getTeachers,
   createTeacher,
@@ -21,18 +22,21 @@ router.post(
   "/",
   authMiddleware,
   requireRole(["admin", "scheduler"]),
+  requireWritableInstitution,
   createTeacher
 );
 router.put(
   "/:id",
   authMiddleware,
   requireRole(["admin", "scheduler"]),
+  requireWritableInstitution,
   updateTeacher
 );
 router.delete(
   "/:id",
   authMiddleware,
   requireRole(["admin", "scheduler"]),
+  requireWritableInstitution,
   deleteTeacher
 );
 

@@ -3,6 +3,7 @@ import Institution from "../models/Institution.js";
 import User from "../models/User.js";
 import InviteCode from "../models/InviteCode.js";
 import { logAuditFromRequest } from "../utils/auditLogger.js";
+import { requireWritableInstitution } from "../middleware/institutionStatusMiddleware.js";
 /**
  * GET /api/institution-settings
  * CRITICAL: Only admins can access (enforced by route middleware)
@@ -70,6 +71,14 @@ export const setupInstitution = async (req, res) => {
     return res.status(403).json({ message: "Only admins can setup institution" });
   }
 
+  // CRITICAL: Enforce email verification requirement
+  if (!req.user.emailVerified) {
+    return res.status(403).json({ 
+      message: "Please verify your email address before completing institution setup. Check your inbox for the verification link.",
+      requiresEmailVerification: true 
+    });
+  }
+
   let institution;
 
   if (req.user.institutionId) {
@@ -119,6 +128,51 @@ export const setupInstitution = async (req, res) => {
   });
 };
 
+/**
+ * GET /api/institutions/info
+ * Get institution information including status and plan
+ */
+export const getInstitutionInfo = async (req, res) => {
+  try {
+    if (!req.user.institutionId) {
+      return res.status(403).json({
+        message: "You must be part of an institution",
+      });
+    }
+
+    const institution = await Institution.findById(req.user.institutionId);
+    
+    if (!institution) {
+      return res.status(404).json({ message: "Institution not found" });
+    }
+
+    // Get trial days remaining
+    const { getTrialDaysRemaining } = await import("../utils/institutionStatus.js");
+    const trialDaysRemaining = getTrialDaysRemaining(institution);
+
+    // Get settings to include institution type
+    const settings = await InstitutionSettings.findOne({
+      institutionId: institution._id,
+    });
+
+    res.json({
+      id: institution._id,
+      name: institution.name,
+      status: institution.status,
+      plan: institution.plan,
+      trialStartedAt: institution.trialStartedAt,
+      trialEndsAt: institution.trialEndsAt,
+      trialDaysRemaining,
+      institutionType: settings?.institution_type || null,
+      isSetupComplete: institution.isSetupComplete,
+      createdAt: institution.createdAt,
+    });
+  } catch (error) {
+    console.error("Get institution info error:", error);
+    res.status(500).json({ message: "Failed to get institution info" });
+  }
+};
+
 
 
 
@@ -130,6 +184,15 @@ export const joinInstitutionByInvite = async (req, res) => {
       return res
         .status(403)
         .json({ message: "Only schedulers can join institutions" });
+    }
+
+    // Enforce email verification before allowing schedulers to join institutions
+    if (!req.user.emailVerified) {
+      return res.status(403).json({
+        message:
+          "Please verify your email address before joining an institution. Check your inbox for the verification link.",
+        requiresEmailVerification: true,
+      });
     }
 
     if (!inviteCode) {
