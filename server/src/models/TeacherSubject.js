@@ -23,4 +23,10 @@ const teacherSubjectSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+teacherSubjectSchema.method("toJSON", function () {
+  const { _id, __v, ...obj } = this.toObject();
+  obj.id = _id;
+  return obj;
+});
+
 export default mongoose.model("TeacherSubject", teacherSubjectSchema);

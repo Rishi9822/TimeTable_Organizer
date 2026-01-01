@@ -1,19 +1,11 @@
 import Stripe from "stripe";
 
-/**
- * Stripe Service
- * Handles all Stripe payment operations
- */
-
 let stripeInstance = null;
 
-/**
- * Get Stripe instance (singleton)
- */
 export const getStripe = () => {
   if (!stripeInstance) {
     const secretKey = process.env.STRIPE_SECRET_KEY;
-    
+
     if (!secretKey) {
       console.warn("⚠️ [STRIPE] STRIPE_SECRET_KEY not configured. Stripe features will be disabled.");
       return null;
@@ -22,7 +14,7 @@ export const getStripe = () => {
     stripeInstance = new Stripe(secretKey, {
       apiVersion: "2024-11-20.acacia", // Use latest stable API version
     });
-    
+
     console.log("✅ [STRIPE] Stripe instance initialized");
   }
 
@@ -49,7 +41,7 @@ export const getStripePriceIds = () => {
  */
 export const createCheckoutSession = async (institutionId, plan, email, institutionName) => {
   const stripe = getStripe();
-  
+
   if (!stripe) {
     throw new Error("Stripe is not configured");
   }
@@ -91,7 +83,7 @@ export const createCheckoutSession = async (institutionId, plan, email, institut
     });
 
     console.log(`✅ [STRIPE] Checkout session created for institution ${institutionId}, plan: ${plan}`);
-    
+
     return {
       sessionId: session.id,
       url: session.url,
@@ -102,70 +94,79 @@ export const createCheckoutSession = async (institutionId, plan, email, institut
   }
 };
 
-/**
- * Handle successful checkout
- * @param {object} session - Stripe checkout session
- */
 export const handleCheckoutSuccess = async (session) => {
   const Institution = (await import("../models/Institution.js")).default;
-  
-  const institutionId = session.client_reference_id || session.metadata?.institutionId;
-  const subscriptionId = session.subscription;
-  const customerId = session.customer;
-
-  if (!institutionId) {
-    console.error("❌ [STRIPE] No institution ID in checkout session");
-    return { success: false, error: "No institution ID found" };
-  }
 
   try {
+    const institutionId =
+      session.client_reference_id || session.metadata?.institutionId;
+
+    if (!institutionId) {
+      throw new Error("Institution ID missing in checkout session");
+    }
+
     const stripe = getStripe();
     if (!stripe) {
-      throw new Error("Stripe is not configured");
+      throw new Error("Stripe not initialized");
     }
 
-    // Get subscription details
-    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    // Fetch subscription details
+    const subscription = await stripe.subscriptions.retrieve(
+      session.subscription
+    );
+
     const priceId = subscription.items.data[0]?.price?.id;
-    const plan = session.metadata?.plan || (priceId === getStripePriceIds().flex ? "flex" : "standard");
 
-    // Update institution
+    const priceIds = getStripePriceIds();
+    const plan =
+      priceId === priceIds.flex
+        ? "flex"
+        : priceId === priceIds.standard
+        ? "standard"
+        : "standard";
+
+    // ✅ FETCH INSTITUTION FIRST
     const institution = await Institution.findById(institutionId);
-    
+
     if (!institution) {
-      console.error(`❌ [STRIPE] Institution ${institutionId} not found`);
-      return { success: false, error: "Institution not found" };
+      throw new Error(`Institution not found: ${institutionId}`);
     }
 
-    institution.stripeCustomerId = customerId;
-    institution.stripeSubscriptionId = subscriptionId;
-    institution.stripePriceId = priceId;
-    institution.stripeCurrentPeriodEnd = new Date(subscription.current_period_end * 1000);
+    // ✅ UPDATE SAFELY
     institution.plan = plan;
-    institution.status = "active"; // Activate institution
+    institution.status = "active";
+    institution.stripeCustomerId = session.customer;
+    institution.stripeSubscriptionId = subscription.id;
+    institution.stripePriceId = priceId;
+    institution.stripeCurrentPeriodEnd = new Date(
+      subscription.current_period_end * 1000
+    );
+
     await institution.save();
 
-    console.log(`✅ [STRIPE] Institution ${institutionId} upgraded to ${plan} plan`);
+    console.log(
+      `✅ [STRIPE] Institution ${institution._id} activated with plan ${plan}`
+    );
 
-    return { success: true, institution, plan };
+    return { success: true };
   } catch (error) {
-    console.error(`❌ [STRIPE] Error handling checkout success:`, error.message);
-    return { success: false, error: error.message };
+    console.error(
+      "❌ [STRIPE] handleCheckoutSuccess failed:",
+      error.message
+    );
+    throw error;
   }
 };
 
-/**
- * Handle payment failure
- * @param {object} invoice - Stripe invoice
- */
+
 export const handlePaymentFailure = async (invoice) => {
   const Institution = (await import("../models/Institution.js")).default;
-  
+
   const customerId = invoice.customer;
-  
+
   try {
     const institution = await Institution.findOne({ stripeCustomerId: customerId });
-    
+
     if (!institution) {
       console.warn(`⚠️ [STRIPE] Institution not found for customer ${customerId}`);
       return { success: false, error: "Institution not found" };
@@ -191,12 +192,12 @@ export const handlePaymentFailure = async (invoice) => {
  */
 export const handleSubscriptionDeleted = async (subscription) => {
   const Institution = (await import("../models/Institution.js")).default;
-  
+
   const subscriptionId = subscription.id;
-  
+
   try {
     const institution = await Institution.findOne({ stripeSubscriptionId: subscriptionId });
-    
+
     if (!institution) {
       console.warn(`⚠️ [STRIPE] Institution not found for subscription ${subscriptionId}`);
       return { success: false, error: "Institution not found" };

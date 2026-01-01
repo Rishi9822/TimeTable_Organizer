@@ -1,64 +1,67 @@
 import Institution from "../models/Institution.js";
-import { isReadOnly, canEdit, checkAndUpdateTrialStatus } from "../utils/institutionStatus.js";
+import {
+  isReadOnly,
+  canEdit,
+  checkAndUpdateTrialStatus,
+} from "../utils/institutionStatus.js";
 
 /**
- * Middleware to check institution status
- * Adds institution status info to req.institutionStatus
- * Does NOT block requests - just provides status info
+ * Resolves institution and attaches status context to req
+ * MUST run before requireWritableInstitution
  */
 export const institutionStatusMiddleware = async (req, res, next) => {
   try {
+    // ❌ DO NOT SILENTLY SKIP
     if (!req.user || !req.user.institutionId) {
-      // No institution - continue (for routes that don't require institution)
-      return next();
+      return res.status(403).json({
+        message: "User is not associated with an institution",
+      });
     }
 
     const institution = await Institution.findById(req.user.institutionId);
-    
+
     if (!institution) {
-      return res.status(404).json({ message: "Institution not found" });
+      return res.status(404).json({
+        message: "Institution not found",
+      });
     }
 
-    // Check and update trial status if expired
+    // Ensure trial status is always up-to-date
     await checkAndUpdateTrialStatus(institution);
-    
-    // Refresh institution data after potential update
-    const updatedInstitution = await Institution.findById(req.user.institutionId);
 
-    // Attach status info to request
+    // ✅ ALWAYS INITIALIZE
     req.institutionStatus = {
-      status: updatedInstitution.status,
-      plan: updatedInstitution.plan,
-      trialEndsAt: updatedInstitution.trialEndsAt,
-      trialStartedAt: updatedInstitution.trialStartedAt,
-      isReadOnly: isReadOnly(updatedInstitution),
-      canEdit: canEdit(updatedInstitution),
-      institution: updatedInstitution,
+      institution,
+      status: institution.status,
+      plan: institution.plan,
+      trialEndsAt: institution.trialEndsAt,
+      trialStartedAt: institution.trialStartedAt,
+      isReadOnly: isReadOnly(institution),
+      canEdit: canEdit(institution),
     };
 
     next();
   } catch (error) {
-    console.error("Institution status middleware error:", error);
-    // Don't block on middleware error - continue but without status info
-    req.institutionStatus = null;
-    next();
+    console.error("❌ Institution status middleware error:", error);
+    return res.status(500).json({
+      message: "Failed to resolve institution status",
+    });
   }
 };
 
 /**
- * Middleware to block write operations for read-only institutions
- * Use this on routes that modify data (POST, PUT, DELETE, PATCH)
+ * Blocks write operations when institution is read-only
  */
-export const requireWritableInstitution = async (req, res, next) => {
-  // First check institution status
+export const requireWritableInstitution = (req, res, next) => {
   if (!req.institutionStatus) {
-    // If status middleware wasn't run, check now
-    await institutionStatusMiddleware(req, res, () => {});
+    return res.status(500).json({
+      message: "Institution status middleware not initialized",
+    });
   }
 
-  if (req.institutionStatus && req.institutionStatus.isReadOnly) {
+  if (req.institutionStatus.isReadOnly) {
     return res.status(403).json({
-      message: "This institution is in read-only mode. Please upgrade your plan to continue editing.",
+      message: `This institution is in ${req.institutionStatus.status} state and is read-only.`,
       status: req.institutionStatus.status,
       plan: req.institutionStatus.plan,
     });
@@ -66,12 +69,4 @@ export const requireWritableInstitution = async (req, res, next) => {
 
   next();
 };
-
-
-
-
-
-
-
-
 

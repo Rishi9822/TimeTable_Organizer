@@ -5,6 +5,7 @@ import User from "../models/User.js";
 import Institution from "../models/Institution.js";
 import { generateSecureToken, hashToken, compareTokens } from "../utils/tokenUtils.js";
 import { sendVerificationEmail, sendPasswordResetEmail } from "../utils/emailService.js";
+import authMiddleware from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
@@ -25,29 +26,7 @@ const strictLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-const authMiddleware = async (req, res, next) => {
-  const authHeader = req.headers.authorization;
 
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({ message: "Not authenticated" });
-  }
-
-  const token = authHeader.split(" ")[1];
-
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.id).select("-password");
-
-    if (!user) {
-      return res.status(401).json({ message: "User not found" });
-    }
-
-    req.user = user;
-    next();
-  } catch {
-    return res.status(401).json({ message: "Invalid token" });
-  }
-};
 
 router.post("/register", authLimiter, async (req, res) => {
   try {
@@ -110,7 +89,7 @@ router.post("/register", authLimiter, async (req, res) => {
     // Fetch user with institution data
     const userWithInstitution = await User.findById(user._id).select("-password");
     let isSetupComplete = false;
-    
+
     if (userWithInstitution.institutionId) {
       const institution = await Institution.findById(userWithInstitution.institutionId);
       isSetupComplete = Boolean(institution?.isSetupComplete);
@@ -306,7 +285,7 @@ router.post("/resend-verification", strictLimiter, async (req, res) => {
 
     // Send verification email and log result
     const emailResult = await sendVerificationEmail(user.email, user.name, verificationToken);
-    
+
     if (!emailResult.success) {
       console.warn(`⚠️ [AUTH] Failed to send resend verification email to ${email}: ${emailResult.error}`);
       // Still return success to prevent user enumeration
@@ -353,7 +332,7 @@ router.post("/forgot-password", strictLimiter, async (req, res) => {
 
     // Send password reset email and log result
     const emailResult = await sendPasswordResetEmail(user.email, user.name, resetToken);
-    
+
     if (!emailResult.success) {
       console.warn(`⚠️ [AUTH] Failed to send password reset email to ${user.email}: ${emailResult.error}`);
       // Still return success to prevent user enumeration

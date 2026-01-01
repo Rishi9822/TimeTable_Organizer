@@ -1,7 +1,7 @@
 import express from "express";
 import authMiddleware from "../middleware/authMiddleware.js";
 import { requireRole } from "../middleware/roleMiddleware.js";
-import { requireWritableInstitution } from "../middleware/institutionStatusMiddleware.js";
+import { requireWritableInstitution, institutionStatusMiddleware } from "../middleware/institutionStatusMiddleware.js";
 import {
   getTimetable,
   getAllTimetables,
@@ -32,6 +32,7 @@ router.get(
 router.post(
   "/:classId",
   authMiddleware,
+  institutionStatusMiddleware,
   requireRole(["admin", "scheduler"]),
   requireWritableInstitution,
   saveTimetable
@@ -40,6 +41,7 @@ router.post(
 router.put(
   "/:classId",
   authMiddleware,
+  institutionStatusMiddleware,
   requireRole(["admin", "scheduler"]),
   requireWritableInstitution,
   updateTimetable
@@ -48,6 +50,7 @@ router.put(
 router.post(
   "/:classId/publish",
   authMiddleware,
+  institutionStatusMiddleware,
   requireRole(["admin", "scheduler"]),
   requireWritableInstitution,
   publishTimetable

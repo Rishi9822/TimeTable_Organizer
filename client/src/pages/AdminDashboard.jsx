@@ -13,6 +13,7 @@ import InviteCodesCard from "@/components/admin/InviteCodesCard";
 import { InstitutionStatusBanner } from "@/components/admin/InstitutionStatusBanner";
 import { InstitutionPlanCard } from "@/components/admin/InstitutionPlanCard";
 import { PlanUpgradeActions } from "@/components/admin/PlanUpgradeActions";
+import { InstitutionModeCard } from "@/components/admin/InstitutionModeCard";
 import {
   Calendar,
   Users,
@@ -23,8 +24,29 @@ import {
   FileText,
 } from "lucide-react";
 
+import { useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+
+
 const AdminDashboard = () => {
   const { user } = useAuth();
+
+  const [searchParams] = useSearchParams();
+  const queryClient = useQueryClient();
+  const { refreshUserData } = useAuth();
+
+
+  useEffect(() => {
+    const sessionId = searchParams.get("session_id");
+    if (sessionId) {
+      refreshUserData(); // ✅ CRITICAL
+      queryClient.invalidateQueries({ queryKey: ["institutionInfo"] });
+      window.history.replaceState({}, "", "/admin");
+    }
+  }, [searchParams]);
+
+
 
   return (
     <div className="min-h-screen bg-background">
@@ -152,6 +174,9 @@ const AdminDashboard = () => {
 
           {/* Plan Upgrade Actions */}
           <PlanUpgradeActions />
+
+          {/* Institution Mode (School / College) */}
+          <InstitutionModeCard />
 
           {/* Activity Log */}
           <Card>

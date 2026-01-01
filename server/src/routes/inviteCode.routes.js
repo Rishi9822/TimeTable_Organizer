@@ -1,7 +1,7 @@
 import express from "express";
 import authMiddleware from "../middleware/authMiddleware.js";
 import { requireRole } from "../middleware/roleMiddleware.js";
-import { requireWritableInstitution } from "../middleware/institutionStatusMiddleware.js";
+import { requireWritableInstitution, institutionStatusMiddleware } from "../middleware/institutionStatusMiddleware.js";
 import {
   getInviteCodes,
   createInviteCode,
@@ -21,26 +21,19 @@ router.get(
   getInviteCodes
 );
 
-/**
- * POST /api/institutions/invite-codes
- * Only admins can create invite codes
- */
 router.post(
   "/invite-codes",
   authMiddleware,
+  institutionStatusMiddleware,
   requireRole(["admin"]),
   requireWritableInstitution,
   createInviteCode
 );
 
-/**
- * DELETE /api/institutions/invite-codes/:id
- * Only admins can delete invite codes
- * Multi-tenant safety: Admin can only delete codes from their own institution
- */
 router.delete(
   "/invite-codes/:id",
   authMiddleware,
+  institutionStatusMiddleware,
   requireRole(["admin"]),
   requireWritableInstitution,
   deleteInviteCode

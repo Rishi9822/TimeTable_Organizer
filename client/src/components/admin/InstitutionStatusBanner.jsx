@@ -3,15 +3,21 @@ import { useQuery } from "@tanstack/react-query";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle, Clock, CheckCircle, XCircle, Info } from "lucide-react";
 import API from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
+
 
 export const InstitutionStatusBanner = () => {
+  const { user, authReady } = useAuth();
+
   const { data: institutionInfo, isLoading } = useQuery({
     queryKey: ["institutionInfo"],
     queryFn: async () => {
       const { data } = await API.get("/institutions/info");
       return data;
     },
-    staleTime: 60000, // 1 minute
+    enabled: authReady && !!user, // ✅ FIXED
+    staleTime: 0,
+    retry: false,
   });
 
   if (isLoading || !institutionInfo) {
@@ -27,7 +33,7 @@ export const InstitutionStatusBanner = () => {
         <Clock className="h-4 w-4 text-yellow-600" />
         <AlertTitle className="text-yellow-800 dark:text-yellow-200">Trial Ending Soon</AlertTitle>
         <AlertDescription className="text-yellow-700 dark:text-yellow-300">
-          Your trial period ends in {trialDaysRemaining} {trialDaysRemaining === 1 ? "day" : "days"}. 
+          Your trial period ends in {trialDaysRemaining} {trialDaysRemaining === 1 ? "day" : "days"}.
           Upgrade your plan to continue using all features.
         </AlertDescription>
       </Alert>
@@ -41,8 +47,10 @@ export const InstitutionStatusBanner = () => {
         <XCircle className="h-4 w-4 text-red-600" />
         <AlertTitle className="text-red-800 dark:text-red-200">Account Suspended</AlertTitle>
         <AlertDescription className="text-red-700 dark:text-red-300">
-          Your account is in read-only mode. Please upgrade your plan to continue editing timetables.
+          Your account is currently suspended and in read-only mode.
+          Please update your billing details to restore access.
         </AlertDescription>
+
       </Alert>
     );
   }
@@ -54,7 +62,7 @@ export const InstitutionStatusBanner = () => {
         <Info className="h-4 w-4 text-blue-600" />
         <AlertTitle className="text-blue-800 dark:text-blue-200">Trial Account</AlertTitle>
         <AlertDescription className="text-blue-700 dark:text-blue-300">
-          You're currently on a trial plan ({plan}). {trialDaysRemaining} days remaining. 
+          You're currently on a trial plan ({plan}). {trialDaysRemaining} days remaining.
           {institutionType && ` Institution type: ${institutionType}.`}
         </AlertDescription>
       </Alert>
@@ -77,12 +85,4 @@ export const InstitutionStatusBanner = () => {
 
   return null;
 };
-
-
-
-
-
-
-
-
 

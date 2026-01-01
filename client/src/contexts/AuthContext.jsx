@@ -25,6 +25,7 @@ export const AuthProvider = ({ children }) => {
   const [isSetupComplete, setIsSetupComplete] = useState(false);
   const [emailVerified, setEmailVerified] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [authReady, setAuthReady] = useState(false);
 
 
   // 🔁 Restore session on refresh
@@ -33,6 +34,7 @@ export const AuthProvider = ({ children }) => {
       const token = localStorage.getItem("token");
       if (!token) {
         setLoading(false);
+        setAuthReady(true); // ✅ ADD
         return;
       }
 
@@ -50,14 +52,15 @@ export const AuthProvider = ({ children }) => {
         setInstitutionId(null);
         setIsSetupComplete(false);
         setEmailVerified(false);
-
       } finally {
         setLoading(false);
+        setAuthReady(true); // ✅ ADD
       }
     };
 
     loadSession();
   }, []);
+
 
 
   const signUp = async (email, password, name, role = "student") => {
@@ -118,17 +121,17 @@ export const AuthProvider = ({ children }) => {
 
 
   const refreshUserData = async () => {
-  try {
-    const { data } = await API.get("/auth/me");
-    setUser(data.user);
-    setRole(data.user.role);
-    setInstitutionId(data.user.institutionId || null);
-    setIsSetupComplete(!!data.user.isSetupComplete);
-    setEmailVerified(!!data.user.emailVerified);
-  } catch {
-    signOut();
-  }
-};
+    try {
+      const { data } = await API.get("/auth/me");
+      setUser(data.user);
+      setRole(data.user.role);
+      setInstitutionId(data.user.institutionId || null);
+      setIsSetupComplete(!!data.user.isSetupComplete);
+      setEmailVerified(!!data.user.emailVerified);
+    } catch {
+      signOut();
+    }
+  };
 
 
   const hasRole = (requiredRole) => {
@@ -144,20 +147,21 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider
-  value={{
-    user,
-    role,
-    institutionId,
-    isSetupComplete,
-    emailVerified,
-    loading,
-    signUp,
-    signIn,
-    signOut,
-    hasRole,
-    refreshUserData,
-  }}
->
+      value={{
+        user,
+        role,
+        institutionId,
+        isSetupComplete,
+        emailVerified,
+        loading,
+        authReady,
+        signUp,
+        signIn,
+        signOut,
+        hasRole,
+        refreshUserData,
+      }}
+    >
 
       {children}
     </AuthContext.Provider>

@@ -4,16 +4,24 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Building2, Clock, Package } from "lucide-react";
 import API from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
+
 
 export const InstitutionPlanCard = () => {
+
+  const { user, authReady } = useAuth();
+
   const { data: institutionInfo, isLoading } = useQuery({
-    queryKey: ["institutionInfo"],
-    queryFn: async () => {
-      const { data } = await API.get("/institutions/info");
-      return data;
-    },
-    staleTime: 60000,
-  });
+  queryKey: ["institutionInfo"],
+  queryFn: async () => {
+    const { data } = await API.get("/institutions/info");
+    return data;
+  },
+  enabled: authReady && !!user,
+  staleTime: 0,
+  retry: false,
+});
+
 
   if (isLoading || !institutionInfo) {
     return (
@@ -96,6 +104,9 @@ export const InstitutionPlanCard = () => {
     </Card>
   );
 };
+
+
+
 
 
 

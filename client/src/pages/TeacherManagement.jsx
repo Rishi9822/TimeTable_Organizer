@@ -201,16 +201,24 @@ const TeacherManagement = () => {
   const handleAssignClass = async (teacherId, subjectId, classId) => {
     try {
       await assignTeacherClass.mutateAsync({
-        teacher_id: teacherId,
-        subject_id: subjectId,
-        class_id: classId,
-        periods_per_week: 4
+        teacherId,
+        subjectId,
+        classId,
+        periods_per_week: 4,
       });
-      toast({ title: 'Success', description: 'Teacher assigned to class' });
+      toast({
+        title: 'Success',
+        description: 'Teacher assigned to class',
+      });
     } catch (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({
+        title: 'Error',
+        description: error.response?.data?.message || error.message,
+        variant: 'destructive',
+      });
     }
   };
+
 
   const teacherSubjectMap = useMemo(() => {
     const map = new Map();
@@ -230,13 +238,14 @@ const TeacherManagement = () => {
   const teacherClassMap = useMemo(() => {
     const map = new Map();
     teacherClassAssignments.forEach(a => {
-      if (!map.has(a.teacher_id)) {
-        map.set(a.teacher_id, []);
+      if (!map.has(a.teacherId)) {
+        map.set(a.teacherId, []);
       }
-      map.get(a.teacher_id).push(a);
+      map.get(a.teacherId).push(a);
     });
     return map;
   }, [teacherClassAssignments]);
+
 
   const getTeacherAssignments = (teacherId) =>
     teacherClassMap.get(teacherId) || [];
@@ -538,7 +547,9 @@ const TeacherManagement = () => {
                                         Select which classes this teacher will teach each subject:
                                       </p>
                                       {assignedSubjects.map(subject => {
-                                        const subjectAssignments = assignments.filter(a => a.subject_id === subject.id);
+                                        const subjectAssignments = assignments.filter(
+                                          a => a.subjectId?.id === subject.id
+                                        );
                                         return (
                                           <div key={subject.id} className="border rounded-lg p-3">
                                             <div className="flex items-center gap-2 mb-3">
@@ -550,8 +561,12 @@ const TeacherManagement = () => {
                                             </div>
                                             <div className="grid grid-cols-2 gap-2">
                                               {classes.map(cls => {
-                                                const isAssignedToClass = subjectAssignments.some(a => a.class_id === cls.id);
-                                                const assignmentId = subjectAssignments.find(a => a.class_id === cls.id)?.id;
+                                                const isAssignedToClass = subjectAssignments.some(
+                                                  a => a.classId?.id === cls.id
+                                                );
+                                                const assignmentId = subjectAssignments.find(
+                                                  a => a.classId === cls.id
+                                                )?.id;
                                                 return (
                                                   <div key={cls.id} className="flex items-center gap-2">
                                                     <Checkbox

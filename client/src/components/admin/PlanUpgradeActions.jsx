@@ -6,16 +6,14 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowRight, CreditCard } from "lucide-react";
 import API from "@/lib/api";
 import { useToast } from "@/hooks/useToast";
+import { useAuth } from "@/contexts/AuthContext";
 
-/**
- * PlanUpgradeActions
- *
- * Admin-only card that lets a verified admin start a Stripe checkout
- * to upgrade from trial → standard or flex. All enforcement still
- * happens server-side; this component is just a thin UX layer.
- */
+
 export const PlanUpgradeActions = () => {
   const { toast } = useToast();
+
+  const { user, authReady } = useAuth();
+
 
   const { data: institutionInfo, isLoading } = useQuery({
     queryKey: ["institutionInfo"],
@@ -23,8 +21,11 @@ export const PlanUpgradeActions = () => {
       const { data } = await API.get("/institutions/info");
       return data;
     },
-    staleTime: 60000,
+    enabled: authReady && !!user,
+    staleTime: 0,
+    retry: false,
   });
+
 
   const upgradeMutation = useMutation({
     mutationFn: async (plan) => {

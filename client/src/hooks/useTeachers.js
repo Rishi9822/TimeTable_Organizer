@@ -174,33 +174,48 @@ export function useAssignTeacherClass() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (payload) => {
-      const res = await api.post("/teacher-class-assignments", payload);
+    mutationFn: async ({
+      teacherId,
+      subjectId,
+      classId,
+      periods_per_week,
+    }) => {
+      const res = await api.post("/teacher-class-assignments", {
+        teacherId,
+        subjectId,
+        classId,
+        periods_per_week,
+      });
       return res.data;
     },
 
+
     // 🔥 OPTIMISTIC UPDATE (NO LAG)
-    onMutate: async (newAssignment) => {
-      await queryClient.cancelQueries({
-        queryKey: ["teacher-class-assignments"],
-      });
+    onMutate: async ({ teacherId, subjectId, classId, periods_per_week }) => {
+  await queryClient.cancelQueries({
+    queryKey: ["teacher-class-assignments"],
+  });
 
-      const previous =
-        queryClient.getQueryData(["teacher-class-assignments"]);
+  const previous =
+    queryClient.getQueryData(["teacher-class-assignments"]);
 
-      queryClient.setQueryData(
-        ["teacher-class-assignments"],
-        (old = []) => [
-          ...old,
-          {
-            id: "temp-" + Date.now(), // temporary id
-            ...newAssignment,
-          },
-        ]
-      );
+  queryClient.setQueryData(
+    ["teacher-class-assignments"],
+    (old = []) => [
+      ...old,
+      {
+        id: "temp-" + Date.now(),
+        teacherId,
+        subjectId,
+        classId,
+        periods_per_week,
+      },
+    ]
+  );
 
-      return { previous };
-    },
+  return { previous };
+},
+
 
     onError: (_err, _vars, context) => {
       if (context?.previous) {

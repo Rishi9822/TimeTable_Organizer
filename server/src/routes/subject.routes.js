@@ -1,7 +1,7 @@
 import express from "express";
 import authMiddleware from "../middleware/authMiddleware.js";
 import { requireRole } from "../middleware/roleMiddleware.js";
-import { requireWritableInstitution } from "../middleware/institutionStatusMiddleware.js";
+import { requireWritableInstitution, institutionStatusMiddleware } from "../middleware/institutionStatusMiddleware.js";
 import {
   getSubjects,
   createSubject,
@@ -20,13 +20,16 @@ router.get(
 router.post(
   "/",
   authMiddleware,
+  institutionStatusMiddleware,
   requireRole(["admin", "scheduler"]),
   requireWritableInstitution,
   createSubject
 );
+
 router.delete(
   "/:id",
   authMiddleware,
+  institutionStatusMiddleware,
   requireRole(["admin", "scheduler"]),
   requireWritableInstitution,
   deleteSubject

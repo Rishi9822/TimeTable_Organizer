@@ -1,7 +1,7 @@
 import express from "express";
 import authMiddleware from "../middleware/authMiddleware.js";
 import { requireRole } from "../middleware/roleMiddleware.js";
-import { requireWritableInstitution } from "../middleware/institutionStatusMiddleware.js";
+import { requireWritableInstitution, institutionStatusMiddleware } from "../middleware/institutionStatusMiddleware.js";
 import {
   getInstitutionSettings,
   upsertInstitutionSettings,
@@ -19,9 +19,9 @@ router.get(
 router.post(
   "/",
   authMiddleware,
+  institutionStatusMiddleware,
   requireRole(["admin"]),
   requireWritableInstitution,
   upsertInstitutionSettings
 );
-
 export default router;

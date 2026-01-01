@@ -1,8 +1,9 @@
 import Teacher from "../models/Teacher.js";
 import TeacherSubject from "../models/TeacherSubject.js";
-import TeacherClassAssignment from "../models/TeacherClassAssignment.js";
+import Assignment from "../models/Assignment.js";
 import Timetable from "../models/Timetable.js";
 import Institution from "../models/Institution.js";
+
 import { getPlanLimits, hasReachedTeacherLimit } from "../utils/planLimits.js";
 import { logAuditFromRequest } from "../utils/auditLogger.js";
 
@@ -67,7 +68,7 @@ export const createTeacher = async (req, res) => {
       "teacher",
       teacher._id,
       { teacherName: teacher.name }
-    ).catch(() => {}); // Silently ignore logging errors
+    ).catch(() => { }); // Silently ignore logging errors
 
     res.status(201).json(teacher);
   } catch (err) {
@@ -104,7 +105,7 @@ export const updateTeacher = async (req, res) => {
       "teacher",
       updated._id,
       { teacherName: updated.name }
-    ).catch(() => {}); // Silently ignore logging errors
+    ).catch(() => { }); // Silently ignore logging errors
 
     res.json(updated);
   } catch (err) {
@@ -112,13 +113,6 @@ export const updateTeacher = async (req, res) => {
   }
 };
 
-/**
- * DELETE /api/teachers/:id
- * Cascade deletion: Removes teacher and all related references
- * - TeacherSubject mappings (teacher-subject relationships)
- * - TeacherClassAssignment mappings (teacher-class assignments)
- * - Timetable period assignments (removes periods with this teacherId from all timetables)
- */
 export const deleteTeacher = async (req, res) => {
   try {
     const teacherId = req.params.id;
@@ -140,14 +134,11 @@ export const deleteTeacher = async (req, res) => {
       institutionId: req.user.institutionId,
     });
 
-    // 2. Delete teacher-class assignments
-    await TeacherClassAssignment.deleteMany({
-      teacher_id: teacherId,
+    // 2. Delete teacher-class assignments (Assignment model)
+    await Assignment.deleteMany({
+      teacherId: teacherId,
       institutionId: req.user.institutionId,
     });
-
-    // 3. Remove teacher references from all timetables
-    // Get all timetables for this institution
     const timetables = await Timetable.find({
       institutionId: req.user.institutionId,
     });
@@ -198,7 +189,7 @@ export const deleteTeacher = async (req, res) => {
       "teacher",
       teacherId,
       { teacherName: teacher.name }
-    ).catch(() => {}); // Silently ignore logging errors
+    ).catch(() => { }); // Silently ignore logging errors
 
     res.json({
       success: true,

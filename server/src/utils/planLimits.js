@@ -86,11 +86,3 @@ export const hasReachedSchedulerLimit = (plan, currentSchedulerCount) => {
   return currentSchedulerCount >= limits.maxSchedulerAccounts;
 };
 
-
-
-
-
-
-
-
-

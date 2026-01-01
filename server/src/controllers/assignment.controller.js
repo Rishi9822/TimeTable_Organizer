@@ -1,9 +1,9 @@
 import TeacherSubject from "../models/TeacherSubject.js";
-import TeacherClassAssignment from "../models/TeacherClassAssignment.js";
 import Teacher from "../models/Teacher.js";
 import Subject from "../models/Subject.js";
 import Class from "../models/Class.js";
 import { logAuditFromRequest } from "../utils/auditLogger.js";
+import Assignment from "../models/Assignment.js";
 
 /**
  * GET /api/teacher-subjects
@@ -144,44 +144,45 @@ export const removeTeacherSubject = async (req, res) => {
  */
 export const getTeacherClassAssignments = async (req, res) => {
   try {
-    // CRITICAL: Filter by institutionId for multi-tenancy
     if (!req.user.institutionId) {
       return res.status(403).json({
         message: "You must be part of an institution to access assignments",
       });
     }
 
-    const data = await TeacherClassAssignment.find({
+    const data = await Assignment.find({
       institutionId: req.user.institutionId,
-    });
+    })
+      .populate("teacherId", "name")
+      .populate("subjectId", "name code color")
+      .populate("classId", "name");
+
     res.json(data);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
 
-/**
- * POST /api/teacher-class-assignments
- */
+
 export const assignTeacherClass = async (req, res) => {
   try {
-    const { teacher_id, subject_id, class_id } = req.body;
+    const { teacherId, subjectId, classId, periods_per_week } = req.body;
 
-    if (!teacher_id || !subject_id || !class_id) {
+    if (!teacherId || !subjectId || !classId) {
       return res.status(400).json({
-        message: "teacher_id, subject_id, and class_id are required",
+        message: "teacherId, subjectId, and classId are required",
       });
     }
 
-    // CRITICAL: Verify all entities belong to user's institution
     if (!req.user.institutionId) {
       return res.status(403).json({
         message: "You must be part of an institution to create assignments",
       });
     }
 
+    // Verify ownership
     const teacher = await Teacher.findOne({
-      _id: teacher_id,
+      _id: teacherId,
       institutionId: req.user.institutionId,
     });
     if (!teacher) {
@@ -189,7 +190,7 @@ export const assignTeacherClass = async (req, res) => {
     }
 
     const subject = await Subject.findOne({
-      _id: subject_id,
+      _id: subjectId,
       institutionId: req.user.institutionId,
     });
     if (!subject) {
@@ -197,36 +198,65 @@ export const assignTeacherClass = async (req, res) => {
     }
 
     const classEntity = await Class.findOne({
-      _id: class_id,
+      _id: classId,
       institutionId: req.user.institutionId,
     });
     if (!classEntity) {
       return res.status(404).json({ message: "Class not found" });
     }
 
-    const record = await TeacherClassAssignment.create({
-      ...req.body,
+    // Prevent duplicates
+    const exists = await Assignment.findOne({
+      teacherId,
+      subjectId,
+      classId,
       institutionId: req.user.institutionId,
     });
-    res.status(201).json(record);
+
+    if (exists) {
+      return res.status(409).json({
+        message: "Teacher already assigned to this subject and class",
+      });
+    }
+
+    const assignment = await Assignment.create({
+      teacherId,
+      subjectId,
+      classId,
+      institutionId: req.user.institutionId,
+      periods_per_week: periods_per_week ?? subject.periods_per_week,
+    });
+
+    // Audit log
+    logAuditFromRequest(
+      req,
+      "ASSIGN_TEACHER_CLASS",
+      "assignment",
+      assignment._id,
+      {
+        teacherName: teacher.name,
+        subjectName: subject.name,
+        className: classEntity.name,
+      }
+    ).catch(() => {});
+
+    res.status(201).json(assignment);
   } catch (err) {
-    res.status(400).json({ message: err.message });
+    console.error("ASSIGN TEACHER CLASS ERROR:", err);
+    res.status(500).json({ message: "Failed to assign class" });
   }
 };
 
-/**
- * DELETE /api/teacher-class-assignments/:id
- */
+
 export const removeTeacherClassAssignment = async (req, res) => {
   try {
-    // CRITICAL: Verify ownership before delete
     if (!req.user.institutionId) {
       return res.status(403).json({
         message: "You must be part of an institution to delete assignments",
       });
     }
 
-    const assignment = await TeacherClassAssignment.findOne({
+    const assignment = await Assignment.findOne({
       _id: req.params.id,
       institutionId: req.user.institutionId,
     });
@@ -235,9 +265,18 @@ export const removeTeacherClassAssignment = async (req, res) => {
       return res.status(404).json({ message: "Assignment not found" });
     }
 
-    await TeacherClassAssignment.findByIdAndDelete(req.params.id);
+    await Assignment.findByIdAndDelete(req.params.id);
+
+    logAuditFromRequest(
+      req,
+      "REMOVE_TEACHER_CLASS",
+      "assignment",
+      assignment._id
+    ).catch(() => {});
+
     res.json({ success: true });
   } catch (err) {
-    res.status(400).json({ message: err.message });
+    res.status(500).json({ message: err.message });
   }
 };
+

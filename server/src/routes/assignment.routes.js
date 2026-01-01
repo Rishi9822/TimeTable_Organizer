@@ -1,7 +1,7 @@
 import express from "express";
 import authMiddleware from "../middleware/authMiddleware.js";
 import { requireRole } from "../middleware/roleMiddleware.js";
-import { requireWritableInstitution } from "../middleware/institutionStatusMiddleware.js";
+import { requireWritableInstitution, institutionStatusMiddleware } from "../middleware/institutionStatusMiddleware.js";
 import Assignment from "../models/Assignment.js";
 import Class from "../models/Class.js";
 
@@ -67,6 +67,7 @@ router.get(
 router.post(
   "/teacher-subjects",
   authMiddleware,
+  institutionStatusMiddleware, // 🔑 REQUIRED
   requireRole(["admin", "scheduler"]),
   requireWritableInstitution,
   assignTeacherSubject
@@ -74,10 +75,12 @@ router.post(
 router.delete(
   "/teacher-subjects/:teacherId/:subjectId",
   authMiddleware,
+  institutionStatusMiddleware, // 🔑 REQUIRED
   requireRole(["admin", "scheduler"]),
   requireWritableInstitution,
   removeTeacherSubject
 );
+
 
 // Teacher ↔ Class
 router.get(
@@ -89,10 +92,12 @@ router.get(
 router.post(
   "/teacher-class-assignments",
   authMiddleware,
+  institutionStatusMiddleware, // 🔑 REQUIRED
   requireRole(["admin", "scheduler"]),
   requireWritableInstitution,
   assignTeacherClass
 );
+
 router.delete(
   "/teacher-class-assignments/:id",
   authMiddleware,
