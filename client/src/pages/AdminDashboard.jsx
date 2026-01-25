@@ -1,4 +1,6 @@
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
+import { useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -22,9 +24,78 @@ import {
   ArrowRight,
   FileText,
 } from "lucide-react";
+import API from "@/lib/api";
+import { useToast } from "@/hooks/useToast";
 
 const AdminDashboard = () => {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  // Handle payment success redirect from Stripe
+  useEffect(() => {
+    const sessionId = searchParams.get("session_id");
+    const canceled = searchParams.get("canceled");
+
+    if (canceled === "true") {
+      toast({
+        title: "Payment canceled",
+        description: "Your payment was canceled. You can try again anytime.",
+        variant: "default",
+      });
+      // Clean up URL
+      setSearchParams({}, { replace: true });
+      return;
+    }
+
+    if (sessionId) {
+      // Verify the session and refresh state
+      const verifySession = async () => {
+        try {
+          const { data } = await API.get(`/stripe/verify-session?session_id=${sessionId}`);
+          
+          if (data.success) {
+            // Invalidate all institution-related queries to force refresh
+            await queryClient.invalidateQueries({ queryKey: ["institutionInfo"] });
+            
+            // Refetch immediately to get updated state
+            await queryClient.refetchQueries({ queryKey: ["institutionInfo"] });
+            
+            toast({
+              title: "Payment successful!",
+              description: `Your plan has been upgraded to ${data.institution.plan}. The page will refresh to show your updated subscription.`,
+            });
+            
+            // Small delay to show toast, then refresh to ensure auth context is updated
+            setTimeout(() => {
+              window.location.reload();
+            }, 1500);
+          }
+        } catch (error) {
+          console.error("Failed to verify session:", error);
+          // Still invalidate queries in case webhook already processed it
+          await queryClient.invalidateQueries({ queryKey: ["institutionInfo"] });
+          await queryClient.refetchQueries({ queryKey: ["institutionInfo"] });
+          
+          toast({
+            title: "Verifying payment...",
+            description: "Please wait while we verify your payment. If you just completed payment, your plan should update shortly.",
+          });
+          
+          // Refresh after a delay to ensure state is synced
+          setTimeout(() => {
+            window.location.reload();
+          }, 2000);
+        } finally {
+          // Clean up URL
+          setSearchParams({}, { replace: true });
+        }
+      };
+
+      verifySession();
+    }
+  }, [searchParams, queryClient, toast, setSearchParams]);
 
   return (
     <div className="min-h-screen bg-background">

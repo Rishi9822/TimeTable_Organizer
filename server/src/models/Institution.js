@@ -63,6 +63,23 @@ const institutionSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+
+    // Flex Plan: Track which modes are completed and which is active
+    completedModes: {
+      type: [String],
+      enum: ["school", "college"],
+      default: [],
+    },
+    activeMode: {
+      type: String,
+      enum: ["school", "college"],
+      default: null,
+    },
+    // Track if institution type is locked (for Standard plan after setup)
+    institutionTypeLocked: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );
@@ -74,6 +91,16 @@ institutionSchema.pre("save", function () {
     const endDate = new Date(this.trialStartedAt || Date.now());
     endDate.setDate(endDate.getDate() + (this.trialDays || 14));
     this.trialEndsAt = endDate;
+  }
+
+  // SaaS Logic: Lock institution type for Standard plan after setup is complete
+  if (this.plan === "standard" && this.isSetupComplete && !this.institutionTypeLocked) {
+    this.institutionTypeLocked = true;
+  }
+
+  // SaaS Logic: For Flex plan, ensure activeMode is set if only one mode is completed
+  if (this.plan === "flex" && this.completedModes.length === 1 && !this.activeMode) {
+    this.activeMode = this.completedModes[0];
   }
 });
 export default mongoose.model("Institution", institutionSchema);

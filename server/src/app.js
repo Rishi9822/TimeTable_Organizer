@@ -48,7 +48,7 @@ if (stripeInstance) {
       return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
-    const { handleCheckoutSuccess, handlePaymentFailure, handleSubscriptionDeleted } = await import("./utils/stripeService.js");
+    const { handleCheckoutSuccess, handlePaymentFailure, handlePaymentSucceeded, handleSubscriptionDeleted } = await import("./utils/stripeService.js");
     const Institution = (await import("./models/Institution.js")).default;
 
     console.log(`📥 [STRIPE] Webhook received: ${event.type}`);
@@ -59,6 +59,12 @@ if (stripeInstance) {
           const session = event.data.object;
           console.log(`✅ [STRIPE] Checkout session completed: ${session.id}`);
           await handleCheckoutSuccess(session);
+          break;
+        }
+        case "invoice.payment_succeeded": {
+          const invoice = event.data.object;
+          console.log(`✅ [STRIPE] Payment succeeded for invoice: ${invoice.id}`);
+          await handlePaymentSucceeded(invoice);
           break;
         }
         case "invoice.payment_failed": {

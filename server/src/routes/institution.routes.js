@@ -7,6 +7,7 @@ import {
   setupInstitution,
   joinInstitutionByInvite,
   getInstitutionInfo,
+  switchMode,
 } from "../controllers/institution.controller.js";
 
 const router = express.Router();
@@ -18,6 +19,8 @@ router.get("/info", authMiddleware, institutionStatusMiddleware, getInstitutionI
 
 router.get("/settings", authMiddleware, institutionStatusMiddleware, getInstitutionSettings);
 router.post("/settings", authMiddleware, institutionStatusMiddleware, upsertInstitutionSettings);
+
+router.post("/switch-mode", authMiddleware, institutionStatusMiddleware, switchMode);
 
 router.post("/join", authMiddleware, joinInstitutionByInvite);
 

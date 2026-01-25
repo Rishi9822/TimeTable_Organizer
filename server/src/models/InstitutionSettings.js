@@ -18,6 +18,31 @@ const schema = new mongoose.Schema(
     lab_duration: Number,
     breaks: Array,
     is_setup_complete: Boolean,
+
+    // Flex Plan: Store settings for both modes (school and college)
+    // This allows flex plan institutions to switch between modes while preserving settings
+    flexModeSettings: {
+      school: {
+        institution_name: String,
+        working_days: [String],
+        periods_per_day: Number,
+        period_duration: Number,
+        start_time: String,
+        lab_duration: Number,
+        breaks: Array,
+        is_setup_complete: Boolean,
+      },
+      college: {
+        institution_name: String,
+        working_days: [String],
+        periods_per_day: Number,
+        period_duration: Number,
+        start_time: String,
+        lab_duration: Number,
+        breaks: Array,
+        is_setup_complete: Boolean,
+      },
+    },
   },
   { timestamps: true }
 );
