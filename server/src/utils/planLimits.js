@@ -86,6 +86,102 @@ export const hasReachedSchedulerLimit = (plan, currentSchedulerCount) => {
   return currentSchedulerCount >= limits.maxSchedulerAccounts;
 };
 
+/**
+ * Validate if institution can switch institution type based on plan rules
+ * @param {object} institution - Institution document
+ * @param {string} newType - New institution type (school or college)
+ * @param {object} settings - Current InstitutionSettings document
+ * @returns {object} { allowed: boolean, reason?: string }
+ */
+export const canSwitchInstitutionType = (institution, newType, settings) => {
+  if (!institution || !newType) {
+    return { allowed: false, reason: "Invalid institution or type" };
+  }
+
+  const currentType = settings?.institution_type;
+
+  // If type hasn't changed, allow
+  if (currentType === newType) {
+    return { allowed: true };
+  }
+
+  // Standard plan: Type is locked after setup
+  if (institution.plan === "standard") {
+    if (institution.institutionTypeLocked || institution.isSetupComplete) {
+      return {
+        allowed: false,
+        reason: "Standard plan locks institution type after setup. Upgrade to Flex plan to switch between school and college modes.",
+      };
+    }
+    // Allow if setup is not complete yet
+    return { allowed: true };
+  }
+
+  // Flex plan: Can switch only after both modes are completed
+  if (institution.plan === "flex") {
+    const completedModes = institution.completedModes || [];
+    
+    // Check if both modes are completed
+    const hasSchool = completedModes.includes("school");
+    const hasCollege = completedModes.includes("college");
+
+    if (!hasSchool || !hasCollege) {
+      return {
+        allowed: false,
+        reason: "Flex plan requires both school and college modes to be set up before switching. Please complete setup for both modes first.",
+      };
+    }
+
+    // Both modes are completed, switching is allowed
+    return { allowed: true };
+  }
+
+  // Trial plan: Type is locked after setup
+  if (institution.plan === "trial") {
+    if (institution.isSetupComplete) {
+      return {
+        allowed: false,
+        reason: "Trial plan locks institution type after setup. Upgrade to Flex plan to switch between school and college modes.",
+      };
+    }
+    return { allowed: true };
+  }
+
+  // Default: not allowed
+  return { allowed: false, reason: "Institution type switching is not allowed for this plan" };
+};
+
+/**
+ * Validate if institution can complete setup for a specific mode (Flex plan)
+ * @param {object} institution - Institution document
+ * @param {string} mode - Mode to setup (school or college)
+ * @returns {object} { allowed: boolean, reason?: string }
+ */
+export const canCompleteModeSetup = (institution, mode) => {
+  if (!institution || !mode || !["school", "college"].includes(mode)) {
+    return { allowed: false, reason: "Invalid institution or mode" };
+  }
+
+  // Only Flex plan supports multiple mode setups
+  if (institution.plan !== "flex") {
+    return { allowed: false, reason: "Multiple mode setup is only available for Flex plan" };
+  }
+
+  const completedModes = institution.completedModes || [];
+  
+  // Check if mode is already completed
+  if (completedModes.includes(mode)) {
+    return { allowed: false, reason: `Mode "${mode}" is already set up` };
+  }
+
+  // Flex plan allows up to 2 modes (school and college)
+  if (completedModes.length >= 2) {
+    return { allowed: false, reason: "Maximum of 2 modes (school and college) can be set up" };
+  }
+
+  return { allowed: true };
+};
+
 
 
 
