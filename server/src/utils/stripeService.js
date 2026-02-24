@@ -103,6 +103,39 @@ export const createCheckoutSession = async (institutionId, plan, email, institut
 };
 
 /**
+ * Set modeType on all existing docs for an institution (used when upgrading to Flex).
+ * Only updates docs where modeType is null or missing.
+ */
+async function backfillModeTypeForInstitution(institutionId, mode) {
+  if (!institutionId || !["school", "college"].includes(mode)) return;
+  const filter = {
+    institutionId,
+    $or: [{ modeType: null }, { modeType: { $exists: false } }],
+  };
+  const set = { $set: { modeType: mode } };
+  const Teacher = (await import("../models/Teacher.js")).default;
+  const Subject = (await import("../models/Subject.js")).default;
+  const Class = (await import("../models/Class.js")).default;
+  const TeacherSubject = (await import("../models/TeacherSubject.js")).default;
+  const TeacherClassAssignment = (await import("../models/TeacherClassAssignment.js")).default;
+  const Timetable = (await import("../models/Timetable.js")).default;
+  const Assignment = (await import("../models/Assignment.js")).default;
+  const models = [
+    [Teacher, "Teacher"],
+    [Subject, "Subject"],
+    [Class, "Class"],
+    [TeacherSubject, "TeacherSubject"],
+    [TeacherClassAssignment, "TeacherClassAssignment"],
+    [Timetable, "Timetable"],
+    [Assignment, "Assignment"],
+  ];
+  for (const [Model] of models) {
+    await Model.updateMany(filter, set);
+  }
+  console.log(`✅ [STRIPE] Backfilled modeType="${mode}" for institution ${institutionId}`);
+}
+
+/**
  * Handle successful checkout
  * @param {object} session - Stripe checkout session
  */
@@ -155,10 +188,11 @@ export const handleCheckoutSuccess = async (session) => {
     institution.status = "active"; // Activate institution immediately
 
     // SaaS Logic: For Standard plan upgrade, lock institution type if setup is complete
-    // Idempotent: Only update if not already locked
+    // Idempotent: Only update if not already locked. Flex must NEVER have lockedInstitutionType.
     if (plan === "standard" && institution.isSetupComplete && currentInstitutionType) {
       if (!institution.institutionTypeLocked) {
         institution.institutionTypeLocked = true;
+        institution.lockedInstitutionType = currentInstitutionType;
       }
       // Ensure activeMode is set for consistency (Standard only has one mode)
       if (!institution.activeMode) {
@@ -170,14 +204,13 @@ export const handleCheckoutSuccess = async (session) => {
       }
     }
 
-    // SaaS Logic: For Flex plan upgrade, preserve current mode if setup is complete
-    // Idempotent: Only update if needed
+    // SaaS Logic: For Flex plan upgrade, preserve current mode and sync setup flags
+    // Flex must NEVER have lockedInstitutionType set.
     if (plan === "flex" && institution.isSetupComplete && currentInstitutionType) {
-      // Unlock institution type (Flex plan allows switching)
       if (institution.institutionTypeLocked) {
         institution.institutionTypeLocked = false;
       }
-      
+      institution.lockedInstitutionType = null;
       const completedModes = institution.completedModes || [];
       if (!completedModes.includes(currentInstitutionType)) {
         institution.completedModes = [...completedModes, currentInstitutionType];
@@ -185,15 +218,21 @@ export const handleCheckoutSuccess = async (session) => {
       if (!institution.activeMode) {
         institution.activeMode = currentInstitutionType;
       }
+      // Ensure current mode’s setup flag is set (Trial→Flex and Standard→Flex)
+      const flag = currentInstitutionType === "school" ? "schoolSetupComplete" : "collegeSetupComplete";
+      await InstitutionSettings.findOneAndUpdate(
+        { institutionId: institution._id },
+        { $set: { [flag]: true } },
+        { upsert: false }
+      ).catch(() => {});
     }
 
-    // SaaS Logic: Handle upgrade from Standard to Flex (unlock type)
-    // Idempotent: Only unlock if currently locked
+    // SaaS Logic: Handle upgrade from Standard to Flex (unlock type, preserve setup)
     if (previousPlan === "standard" && plan === "flex") {
       if (institution.institutionTypeLocked) {
         institution.institutionTypeLocked = false;
       }
-      // Preserve existing mode
+      institution.lockedInstitutionType = null;
       if (currentInstitutionType) {
         const completedModes = institution.completedModes || [];
         if (!completedModes.includes(currentInstitutionType)) {
@@ -202,6 +241,7 @@ export const handleCheckoutSuccess = async (session) => {
         if (!institution.activeMode) {
           institution.activeMode = currentInstitutionType;
         }
+        // Setup flag for current mode already set in the Flex block above
       }
     }
 
@@ -212,6 +252,14 @@ export const handleCheckoutSuccess = async (session) => {
     }
 
     await institution.save();
+
+    // When upgrading to Flex: backfill modeType on existing data so lists aren’t empty
+    if (plan === "flex" && (institution.activeMode || currentInstitutionType)) {
+      const mode = institution.activeMode || currentInstitutionType;
+      await backfillModeTypeForInstitution(institution._id, mode).catch((err) => {
+        console.warn("⚠️ [STRIPE] Flex modeType backfill failed (non-fatal):", err?.message);
+      });
+    }
 
     console.log(`✅ [STRIPE] Institution ${institutionId} upgraded from ${previousPlan} to ${plan} plan, status: ${institution.status}`);
 

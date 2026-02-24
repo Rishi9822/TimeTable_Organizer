@@ -27,6 +27,11 @@ const assignmentSchema = new mongoose.Schema(
       type: Number,
       default: 4,
     },
+    modeType: {
+      type: String,
+      enum: ["school", "college"],
+      default: null,
+    },
   },
   { timestamps: true }
 );

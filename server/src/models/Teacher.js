@@ -29,6 +29,12 @@ const teacherSchema = new mongoose.Schema(
       type: Number,
       default: 6,
     },
+    // Flex plan: isolates records by mode (school | college)
+    modeType: {
+      type: String,
+      enum: ["school", "college"],
+      default: null,
+    },
   },
   { timestamps: true }
 );

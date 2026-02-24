@@ -1,24 +1,42 @@
 import React from "react";
-import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertTriangle, Clock, CheckCircle, XCircle, Info } from "lucide-react";
-import API from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Clock, CheckCircle, XCircle, Info, GraduationCap, School } from "lucide-react";
+import { useInstitutionInfo } from "@/hooks/useTeachers";
 
 export const InstitutionStatusBanner = () => {
-  const { data: institutionInfo, isLoading } = useQuery({
-    queryKey: ["institutionInfo"],
-    queryFn: async () => {
-      const { data } = await API.get("/institutions/info");
-      return data;
-    },
-    staleTime: 60000, // 1 minute
-  });
+  const { data: institutionInfo, isLoading } = useInstitutionInfo();
 
   if (isLoading || !institutionInfo) {
     return null;
   }
 
-  const { status, plan, trialDaysRemaining, institutionType } = institutionInfo;
+  const { status, plan, trialDaysRemaining, institutionType, schoolSetupComplete, collegeSetupComplete } = institutionInfo;
+
+  // Flex: prompt to complete second setup when exactly one mode is done
+  const needsSecondSetup = plan === "flex" && (
+    (schoolSetupComplete && !collegeSetupComplete) || (!schoolSetupComplete && collegeSetupComplete)
+  );
+  const missingMode = needsSecondSetup && !schoolSetupComplete ? "school" : needsSecondSetup && !collegeSetupComplete ? "college" : null;
+
+  // Flex second-setup prompt (one mode complete, other not)
+  if (needsSecondSetup && missingMode) {
+    return (
+      <Alert className="border-primary bg-primary/5 mb-4">
+        {missingMode === "college" ? <GraduationCap className="h-4 w-4" /> : <School className="h-4 w-4" />}
+        <AlertTitle>Complete {missingMode === "college" ? "College" : "School"} setup</AlertTitle>
+        <AlertDescription className="flex flex-wrap items-center gap-2">
+          <span>
+            Finish setup for {missingMode} mode to unlock switching between School and College.
+          </span>
+          <Button asChild size="sm" variant="default">
+            <Link to={`/setup?mode=${missingMode}`}>Complete {missingMode} setup</Link>
+          </Button>
+        </AlertDescription>
+      </Alert>
+    );
+  }
 
   // Trial expiring soon (less than 3 days)
   if (status === "trial" && trialDaysRemaining !== null && trialDaysRemaining <= 3 && trialDaysRemaining > 0) {
@@ -70,6 +88,7 @@ export const InstitutionStatusBanner = () => {
         <AlertDescription className="text-green-700 dark:text-green-300">
           Plan: {plan === "standard" ? "Standard" : plan === "flex" ? "Flex" : plan}
           {institutionType && ` • Type: ${institutionType}`}
+          {plan === "flex" && institutionInfo.activeMode && ` • Mode: ${institutionInfo.activeMode}`}
         </AlertDescription>
       </Alert>
     );

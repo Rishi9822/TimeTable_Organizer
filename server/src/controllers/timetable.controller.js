@@ -2,6 +2,7 @@ import Timetable from "../models/Timetable.js";
 import Class from "../models/Class.js";
 import Teacher from "../models/Teacher.js";
 import Subject from "../models/Subject.js";
+import Institution from "../models/Institution.js";
 import { logAuditFromRequest } from "../utils/auditLogger.js";
 
 /**
@@ -10,23 +11,20 @@ import { logAuditFromRequest } from "../utils/auditLogger.js";
  */
 export const getAllTimetables = async (req, res) => {
   try {
-    // CRITICAL: Verify user belongs to an institution
     if (!req.user.institutionId) {
       return res.status(403).json({
         message: "You must be part of an institution to access timetables",
       });
     }
-
-    // Get current academic year
+    const institution = await Institution.findById(req.user.institutionId);
     const now = new Date();
     const year = now.getFullYear();
     const academicYear = `${year}-${year + 1}`;
-
-    // Get all timetables (draft and published) for the institution
-    const timetables = await Timetable.find({
-      institutionId: req.user.institutionId,
-      academicYear,
-    }).select("classId periods isPublished academicYear");
+    const query = { institutionId: req.user.institutionId, academicYear };
+    if (institution?.plan === "flex" && institution.activeMode) {
+      query.modeType = institution.activeMode;
+    }
+    const timetables = await Timetable.find(query).select("classId periods isPublished academicYear");
 
     // Convert to array format expected by frontend
     const result = timetables.map((tt) => ({
@@ -58,35 +56,25 @@ export const getTimetable = async (req, res) => {
       });
     }
 
-    const classEntity = await Class.findOne({
-      _id: classId,
-      institutionId: req.user.institutionId,
-    });
-
+    const institution = await Institution.findById(req.user.institutionId);
+    const classQuery = { _id: classId, institutionId: req.user.institutionId };
+    if (institution?.plan === "flex" && institution.activeMode) {
+      classQuery.modeType = institution.activeMode;
+    }
+    const classEntity = await Class.findOne(classQuery);
     if (!classEntity) {
       return res.status(404).json({ message: "Class not found" });
     }
-
-    // Get current academic year
     const now = new Date();
     const year = now.getFullYear();
     const academicYear = `${year}-${year + 1}`;
-
-    // Try to get draft first, then published
-    let timetable = await Timetable.findOne({
-      classId,
-      institutionId: req.user.institutionId,
-      academicYear,
-      isPublished: false,
-    });
-
+    const ttQuery = { classId, institutionId: req.user.institutionId, academicYear };
+    if (institution?.plan === "flex" && institution.activeMode) {
+      ttQuery.modeType = institution.activeMode;
+    }
+    let timetable = await Timetable.findOne({ ...ttQuery, isPublished: false });
     if (!timetable) {
-      timetable = await Timetable.findOne({
-        classId,
-        institutionId: req.user.institutionId,
-        academicYear,
-        isPublished: true,
-      });
+      timetable = await Timetable.findOne({ ...ttQuery, isPublished: true });
     }
 
     if (!timetable) {
@@ -129,33 +117,26 @@ export const saveTimetable = async (req, res) => {
       });
     }
 
-    const classEntity = await Class.findOne({
-      _id: classId,
-      institutionId: req.user.institutionId,
-    });
-
+    const institution = await Institution.findById(req.user.institutionId);
+    const classQuery = { _id: classId, institutionId: req.user.institutionId };
+    if (institution?.plan === "flex" && institution.activeMode) {
+      classQuery.modeType = institution.activeMode;
+    }
+    const classEntity = await Class.findOne(classQuery);
     if (!classEntity) {
       return res.status(404).json({ message: "Class not found" });
     }
-
-    // Validate periods structure
     if (periods && typeof periods !== "object") {
       return res.status(400).json({ message: "Invalid periods structure" });
     }
-
-    // Get academic year
     const now = new Date();
     const year = now.getFullYear();
     const finalAcademicYear = academicYear || `${year}-${year + 1}`;
-
-    // Find or create draft timetable
-    let timetable = await Timetable.findOne({
-      classId,
-      institutionId: req.user.institutionId,
-      academicYear: finalAcademicYear,
-      isPublished: false,
-    });
-
+    const ttQuery = { classId, institutionId: req.user.institutionId, academicYear: finalAcademicYear, isPublished: false };
+    if (institution?.plan === "flex" && institution.activeMode) {
+      ttQuery.modeType = institution.activeMode;
+    }
+    let timetable = await Timetable.findOne(ttQuery);
     if (timetable) {
       // Update existing draft
       // CRITICAL: Convert periods object to Map if needed
@@ -173,7 +154,7 @@ export const saveTimetable = async (req, res) => {
         ? new Map(Object.entries(periods))
         : (periods || new Map());
       
-      timetable = await Timetable.create({
+      const createPayload = {
         classId,
         institutionId: req.user.institutionId,
         academicYear: finalAcademicYear,
@@ -181,7 +162,11 @@ export const saveTimetable = async (req, res) => {
         periods: periodsMap,
         isPublished: false,
         createdBy: req.user._id,
-      });
+      };
+      if (institution?.plan === "flex" && institution.activeMode) {
+        createPayload.modeType = institution.activeMode;
+      }
+      timetable = await Timetable.create(createPayload);
     }
 
     // Convert Map to object for JSON response
@@ -229,27 +214,23 @@ export const publishTimetable = async (req, res) => {
       });
     }
 
-    const classEntity = await Class.findOne({
-      _id: classId,
-      institutionId: req.user.institutionId,
-    });
-
+    const institution = await Institution.findById(req.user.institutionId);
+    const classQuery = { _id: classId, institutionId: req.user.institutionId };
+    if (institution?.plan === "flex" && institution.activeMode) {
+      classQuery.modeType = institution.activeMode;
+    }
+    const classEntity = await Class.findOne(classQuery);
     if (!classEntity) {
       return res.status(404).json({ message: "Class not found" });
     }
-
-    // Get current academic year
     const now = new Date();
     const year = now.getFullYear();
     const academicYear = `${year}-${year + 1}`;
-
-    // Find draft timetable
-    const draft = await Timetable.findOne({
-      classId,
-      institutionId: req.user.institutionId,
-      academicYear,
-      isPublished: false,
-    });
+    const ttQuery = { classId, institutionId: req.user.institutionId, academicYear, isPublished: false };
+    if (institution?.plan === "flex" && institution.activeMode) {
+      ttQuery.modeType = institution.activeMode;
+    }
+    const draft = await Timetable.findOne(ttQuery);
 
     if (!draft) {
       return res.status(404).json({
@@ -257,16 +238,11 @@ export const publishTimetable = async (req, res) => {
       });
     }
 
-    // Unpublish previous published version if exists
-    await Timetable.updateMany(
-      {
-        classId,
-        institutionId: req.user.institutionId,
-        academicYear,
-        isPublished: true,
-      },
-      { isPublished: false }
-    );
+    const unpublishQuery = { classId, institutionId: req.user.institutionId, academicYear, isPublished: true };
+    if (institution?.plan === "flex" && institution.activeMode) {
+      unpublishQuery.modeType = institution.activeMode;
+    }
+    await Timetable.updateMany(unpublishQuery, { isPublished: false });
 
     // Publish the draft
     draft.isPublished = true;
@@ -312,42 +288,36 @@ export const detectConflicts = async (req, res) => {
       });
     }
 
-    const classEntity = await Class.findOne({
-      _id: classId,
-      institutionId: req.user.institutionId,
-    });
-
+    const institution = await Institution.findById(req.user.institutionId);
+    const classQuery = { _id: classId, institutionId: req.user.institutionId };
+    if (institution?.plan === "flex" && institution.activeMode) {
+      classQuery.modeType = institution.activeMode;
+    }
+    const classEntity = await Class.findOne(classQuery);
     if (!classEntity) {
       return res.status(404).json({ message: "Class not found" });
     }
-
-    // Get current academic year
     const now = new Date();
     const year = now.getFullYear();
     const academicYear = `${year}-${year + 1}`;
-
-    // Get draft timetable for this class
-    const timetable = await Timetable.findOne({
-      classId,
-      institutionId: req.user.institutionId,
-      academicYear,
-      isPublished: false,
-    });
-
+    const ttQuery = { classId, institutionId: req.user.institutionId, academicYear, isPublished: false };
+    if (institution?.plan === "flex" && institution.activeMode) {
+      ttQuery.modeType = institution.activeMode;
+    }
+    const timetable = await Timetable.findOne(ttQuery);
     if (!timetable || !timetable.periods) {
       return res.json({ conflicts: [], warnings: [] });
     }
-
-    // Get all timetables (draft and published) for the institution
-    const allTimetables = await Timetable.find({
-      institutionId: req.user.institutionId,
-      academicYear,
-    }).populate("classId", "name section");
-
-    // Get all teachers for max periods validation
-    const teachers = await Teacher.find({
-      institutionId: req.user.institutionId,
-    });
+    const allTtQuery = { institutionId: req.user.institutionId, academicYear };
+    if (institution?.plan === "flex" && institution.activeMode) {
+      allTtQuery.modeType = institution.activeMode;
+    }
+    const allTimetables = await Timetable.find(allTtQuery).populate("classId", "name section");
+    const teacherQuery = { institutionId: req.user.institutionId };
+    if (institution?.plan === "flex" && institution.activeMode) {
+      teacherQuery.modeType = institution.activeMode;
+    }
+    const teachers = await Teacher.find(teacherQuery);
 
     const conflicts = [];
     const warnings = [];

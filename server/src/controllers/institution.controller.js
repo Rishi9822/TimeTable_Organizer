@@ -158,8 +158,12 @@ export const setupInstitution = async (req, res) => {
       institutionId: institution._id,
     });
 
-    if (institution.plan === "flex" && settings?.institution_type) {
-      const mode = settings.institution_type;
+    // Flex second setup: mode can come from body (e.g. /setup?mode=college) or from settings
+    const modeForSetup = req.body.institution_type || settings?.institution_type;
+    let completedModeThisRequest = null; // used to persist schoolSetupComplete/collegeSetupComplete
+
+    if (institution.plan === "flex" && modeForSetup) {
+      const mode = modeForSetup;
       const completedModes = institution.completedModes || [];
       
       // SaaS Logic: Prevent duplicate setup for already completed mode
@@ -179,6 +183,7 @@ export const setupInstitution = async (req, res) => {
 
       // Add mode to completed modes
       updateData.completedModes = [...completedModes, mode];
+      completedModeThisRequest = mode;
 
       // Set active mode if this is the first completed mode
       if (!institution.activeMode) {
@@ -189,6 +194,7 @@ export const setupInstitution = async (req, res) => {
       // Only if not already locked (allows first-time setup)
       if (!institution.institutionTypeLocked) {
         updateData.institutionTypeLocked = true;
+        updateData.lockedInstitutionType = settings.institution_type;
         updateData.activeMode = settings.institution_type;
         updateData.completedModes = [settings.institution_type];
       }
@@ -205,6 +211,26 @@ export const setupInstitution = async (req, res) => {
       updateData,
       { new: true }
     );
+
+    // Flex: persist setup completion flags on InstitutionSettings (never overwrite existing)
+    if (completedModeThisRequest) {
+      const flagField = completedModeThisRequest === "school" ? "schoolSetupComplete" : "collegeSetupComplete";
+      await InstitutionSettings.findOneAndUpdate(
+        { institutionId: req.user.institutionId },
+        { $set: { [flagField]: true } },
+        { upsert: false }
+      );
+    }
+
+    // Trial/Standard first setup: set the single completed mode's flag for consistency
+    if (!completedModeThisRequest && (institution.plan === "trial" || institution.plan === "standard") && settings?.institution_type) {
+      const flagField = settings.institution_type === "school" ? "schoolSetupComplete" : "collegeSetupComplete";
+      await InstitutionSettings.findOneAndUpdate(
+        { institutionId: req.user.institutionId },
+        { $set: { [flagField]: true } },
+        { upsert: false }
+      );
+    }
 
     // Audit log: Log AFTER successful setup completion
     logAuditFromRequest(
@@ -283,10 +309,14 @@ export const getInstitutionInfo = async (req, res) => {
     };
 
     // SaaS Logic: Add Flex plan specific information
+    const schoolSetupComplete = Boolean(settings?.schoolSetupComplete ?? (institution.completedModes || []).includes("school"));
+    const collegeSetupComplete = Boolean(settings?.collegeSetupComplete ?? (institution.completedModes || []).includes("college"));
     if (institution.plan === "flex") {
       response.activeMode = institution.activeMode;
       response.completedModes = institution.completedModes || [];
-      response.canSwitchMode = (institution.completedModes || []).length >= 2;
+      response.schoolSetupComplete = schoolSetupComplete;
+      response.collegeSetupComplete = collegeSetupComplete;
+      response.canSwitchMode = schoolSetupComplete && collegeSetupComplete;
     }
 
     // SaaS Logic: Add Standard plan locking information
@@ -338,28 +368,29 @@ export const switchMode = async (req, res) => {
       });
     }
 
-    // SaaS Logic: Check if both modes are completed
-    const completedModes = institution.completedModes || [];
-    if (completedModes.length < 2) {
-      return res.status(403).json({
-        message: "Both school and college modes must be set up before switching. Please complete setup for both modes first.",
-      });
-    }
-
-    // SaaS Logic: Check if mode is completed
-    if (!completedModes.includes(mode)) {
-      return res.status(403).json({
-        message: `Mode "${mode}" has not been set up yet. Please complete setup for this mode first.`,
-      });
-    }
-
-    // Get settings to update institution_type
+    // Get settings once for gating and for applying mode
     const settings = await InstitutionSettings.findOne({
       institutionId: institution._id,
     });
 
     if (!settings) {
       return res.status(404).json({ message: "Institution settings not found" });
+    }
+
+    // SaaS Logic: Mode switch allowed ONLY when plan is flex AND both setups complete
+    const schoolDone = Boolean(settings.schoolSetupComplete ?? (institution.completedModes || []).includes("school"));
+    const collegeDone = Boolean(settings.collegeSetupComplete ?? (institution.completedModes || []).includes("college"));
+    if (!schoolDone || !collegeDone) {
+      return res.status(403).json({
+        message: "Both school and college modes must be set up before switching. Please complete setup for both modes first.",
+      });
+    }
+
+    const completedModes = institution.completedModes || [];
+    if (!completedModes.includes(mode)) {
+      return res.status(403).json({
+        message: `Mode "${mode}" has not been set up yet. Please complete setup for this mode first.`,
+      });
     }
 
     // Load settings for the new mode if available (Flex plan stores per-mode settings)

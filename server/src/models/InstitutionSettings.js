@@ -19,6 +19,10 @@ const schema = new mongoose.Schema(
     breaks: Array,
     is_setup_complete: Boolean,
 
+    // Flex Plan: Setup completion per mode (required for mode switching gating)
+    schoolSetupComplete: { type: Boolean, default: false },
+    collegeSetupComplete: { type: Boolean, default: false },
+
     // Flex Plan: Store settings for both modes (school and college)
     // This allows flex plan institutions to switch between modes while preserving settings
     flexModeSettings: {

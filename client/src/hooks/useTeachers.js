@@ -1,6 +1,45 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 
+/** Shared query key for institution info (plan, activeMode, setup flags, etc.) */
+export const INSTITUTION_INFO_QUERY_KEY = ["institutionInfo"];
+
+export function useInstitutionInfo(options = {}) {
+  return useQuery({
+    queryKey: INSTITUTION_INFO_QUERY_KEY,
+    queryFn: async () => {
+      const { data } = await api.get("/institutions/info");
+      return data;
+    },
+    staleTime: 60000,
+    ...options,
+  });
+}
+
+/**
+ * Switch Flex plan active mode. Invalidates all mode-dependent data so UI refetches.
+ * Only allowed when plan === "flex" and both school and college setup are complete.
+ */
+export function useSwitchMode() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (mode) => {
+      const { data } = await api.post("/institutions/switch-mode", { mode });
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: INSTITUTION_INFO_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: ["institution_settings"] });
+      queryClient.invalidateQueries({ queryKey: ["teachers"] });
+      queryClient.invalidateQueries({ queryKey: ["subjects"] });
+      queryClient.invalidateQueries({ queryKey: ["classes"] });
+      queryClient.invalidateQueries({ queryKey: ["teacher-subjects"] });
+      queryClient.invalidateQueries({ queryKey: ["teacher-class-assignments"] });
+      queryClient.invalidateQueries({ queryKey: ["timetables"] });
+    },
+  });
+}
+
 
 export const useTeachers = () => {
   return useQuery({

@@ -5,17 +5,16 @@ import { hasReachedClassLimit, getPlanLimits } from "../utils/planLimits.js";
 
 export const getClasses = async (req, res) => {
   try {
-    // CRITICAL: Filter by institutionId for multi-tenancy
     if (!req.user.institutionId) {
       return res.status(403).json({
         message: "You must be part of an institution to access classes",
       });
     }
-
-    const query = {
-      institutionId: req.user.institutionId,
-    };
-    if (req.query.institution_type) {
+    const institution = await Institution.findById(req.user.institutionId);
+    const query = { institutionId: req.user.institutionId };
+    if (institution?.plan === "flex" && institution.activeMode) {
+      query.modeType = institution.activeMode;
+    } else if (req.query.institution_type) {
       query.institution_type = req.query.institution_type;
     }
     const classes = await Class.find(query).sort({ name: 1 });
@@ -53,13 +52,11 @@ export const createClass = async (req, res) => {
         });
       }
     }
-    // Paid plans (standard/flex) have unlimited classes - no check needed
-
-    // CRITICAL: Force institutionId from authenticated user
-    const cls = await Class.create({
-      ...req.body,
-      institutionId: req.user.institutionId,
-    });
+    const createPayload = { ...req.body, institutionId: req.user.institutionId };
+    if (institution?.plan === "flex" && institution.activeMode) {
+      createPayload.modeType = institution.activeMode;
+    }
+    const cls = await Class.create(createPayload);
 
     // Audit log: Log AFTER successful creation
     logAuditFromRequest(
@@ -78,11 +75,12 @@ export const createClass = async (req, res) => {
 
 export const deleteClass = async (req, res) => {
   try {
-    // CRITICAL: Verify ownership before delete
-    const cls = await Class.findOne({
-      _id: req.params.id,
-      institutionId: req.user.institutionId,
-    });
+    const institution = await Institution.findById(req.user.institutionId);
+    const ownershipQuery = { _id: req.params.id, institutionId: req.user.institutionId };
+    if (institution?.plan === "flex" && institution.activeMode) {
+      ownershipQuery.modeType = institution.activeMode;
+    }
+    const cls = await Class.findOne(ownershipQuery);
 
     if (!cls) {
       return res.status(404).json({ message: "Class not found" });

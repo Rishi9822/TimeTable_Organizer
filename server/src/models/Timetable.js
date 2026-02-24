@@ -56,14 +56,17 @@ const timetableSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    // Flex plan: isolates records by mode (school | college)
+    modeType: {
+      type: String,
+      enum: ["school", "college"],
+      default: null,
+    },
   },
   { timestamps: true }
 );
 
-// Compound index: one active timetable per class per academic year
-timetableSchema.index({ classId: 1, academicYear: 1, isPublished: 1 });
-
-// Ensure one draft per class per academic year
+// One draft per class per academic year (unique partial index; also used for lookups)
 timetableSchema.index(
   { classId: 1, academicYear: 1, isPublished: 1 },
   {

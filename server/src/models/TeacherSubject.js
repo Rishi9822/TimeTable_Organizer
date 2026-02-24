@@ -19,6 +19,12 @@ const teacherSubjectSchema = new mongoose.Schema(
       ref: "Subject",
       required: true,
     },
+    // Flex plan: isolates records by mode (school | college)
+    modeType: {
+      type: String,
+      enum: ["school", "college"],
+      default: null,
+    },
   },
   { timestamps: true }
 );

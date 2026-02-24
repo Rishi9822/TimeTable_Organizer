@@ -17,6 +17,12 @@ const classSchema = new mongoose.Schema(
       required: true,
     },
     capacity: { type: Number, default: 40 },
+    // Flex plan: isolates records by mode (school | college). When set, used for Flex filtering.
+    modeType: {
+      type: String,
+      enum: ["school", "college"],
+      default: null,
+    },
   },
   { timestamps: true }
 );

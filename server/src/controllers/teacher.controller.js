@@ -15,9 +15,12 @@ export const getTeachers = async (req, res) => {
       });
     }
 
-    const teachers = await Teacher.find({
-      institutionId: req.user.institutionId,
-    }).sort({ name: 1 });
+    const institution = await Institution.findById(req.user.institutionId);
+    const query = { institutionId: req.user.institutionId };
+    if (institution?.plan === "flex" && institution.activeMode) {
+      query.modeType = institution.activeMode;
+    }
+    const teachers = await Teacher.find(query).sort({ name: 1 });
     res.json(teachers);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -33,10 +36,8 @@ export const createTeacher = async (req, res) => {
       });
     }
 
-    // Check plan limits (only for trial plan, paid plans have no limits)
     const institution = await Institution.findById(req.user.institutionId);
     if (institution && institution.plan === "trial") {
-      // Only enforce limits for trial plan
       const currentTeacherCount = await Teacher.countDocuments({
         institutionId: req.user.institutionId,
       });
@@ -52,13 +53,15 @@ export const createTeacher = async (req, res) => {
         });
       }
     }
-    // Paid plans (standard/flex) have unlimited teachers - no check needed
-
-    // CRITICAL: Force institutionId from authenticated user
-    const teacher = await Teacher.create({
+    // CRITICAL: Force institutionId from authenticated user; Flex: set modeType for isolation
+    const createPayload = {
       ...req.body,
       institutionId: req.user.institutionId,
-    });
+    };
+    if (institution?.plan === "flex" && institution.activeMode) {
+      createPayload.modeType = institution.activeMode;
+    }
+    const teacher = await Teacher.create(createPayload);
 
     // Audit log: Log AFTER successful creation
     logAuditFromRequest(
@@ -77,11 +80,12 @@ export const createTeacher = async (req, res) => {
 
 export const updateTeacher = async (req, res) => {
   try {
-    // CRITICAL: Verify ownership before update
-    const teacher = await Teacher.findOne({
-      _id: req.params.id,
-      institutionId: req.user.institutionId,
-    });
+    const institution = await Institution.findById(req.user.institutionId);
+    const ownershipQuery = { _id: req.params.id, institutionId: req.user.institutionId };
+    if (institution?.plan === "flex" && institution.activeMode) {
+      ownershipQuery.modeType = institution.activeMode;
+    }
+    const teacher = await Teacher.findOne(ownershipQuery);
 
     if (!teacher) {
       return res.status(404).json({ message: "Teacher not found" });
@@ -122,12 +126,12 @@ export const updateTeacher = async (req, res) => {
 export const deleteTeacher = async (req, res) => {
   try {
     const teacherId = req.params.id;
-
-    // CRITICAL: Verify ownership before delete
-    const teacher = await Teacher.findOne({
-      _id: teacherId,
-      institutionId: req.user.institutionId,
-    });
+    const institution = await Institution.findById(req.user.institutionId);
+    const ownershipQuery = { _id: teacherId, institutionId: req.user.institutionId };
+    if (institution?.plan === "flex" && institution.activeMode) {
+      ownershipQuery.modeType = institution.activeMode;
+    }
+    const teacher = await Teacher.findOne(ownershipQuery);
 
     if (!teacher) {
       return res.status(404).json({ message: "Teacher not found" });
@@ -146,11 +150,12 @@ export const deleteTeacher = async (req, res) => {
       institutionId: req.user.institutionId,
     });
 
-    // 3. Remove teacher references from all timetables
-    // Get all timetables for this institution
-    const timetables = await Timetable.find({
-      institutionId: req.user.institutionId,
-    });
+    // 3. Remove teacher references from all timetables (same mode for Flex)
+    const timetableQuery = { institutionId: req.user.institutionId };
+    if (institution?.plan === "flex" && institution.activeMode) {
+      timetableQuery.modeType = institution.activeMode;
+    }
+    const timetables = await Timetable.find(timetableQuery);
 
     // Update each timetable to remove periods with this teacherId
     for (const timetable of timetables) {

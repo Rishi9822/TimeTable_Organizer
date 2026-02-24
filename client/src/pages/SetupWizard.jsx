@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   School,
   GraduationCap,
@@ -21,6 +21,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, Mail } from "lucide-react";
 import API from "@/lib/api";
+import { useInstitutionInfo } from "@/hooks/useTeachers";
 
 
 const DAYS = [
@@ -34,16 +35,45 @@ const DAYS = [
 ];
 
 const SetupWizard = () => {
-
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { config, updateConfig, completeSetup, isLoading } = useInstitutionContext();
   const { refreshUserData, emailVerified, user } = useAuth();
+  const { data: institutionInfo } = useInstitutionInfo();
   const email = user?.email;
 
   const [step, setStep] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
   const [resendingVerification, setResendingVerification] = useState(false);
   const totalSteps = 4;
+
+  // Flex second setup: /setup?mode=school|college — prefill institution type and apply presets
+  const modeParam = searchParams.get("mode");
+  const isFlexSecondSetup = institutionInfo?.plan === "flex" && (modeParam === "school" || modeParam === "college");
+  useEffect(() => {
+    if (!isFlexSecondSetup || !modeParam) return;
+    updateConfig({ institutionType: modeParam });
+    if (modeParam === "school") {
+      updateConfig({
+        periodsPerDay: 8,
+        periodDuration: 45,
+        breaks: [
+          { afterPeriod: 3, duration: 15, label: "Short Break" },
+          { afterPeriod: 5, duration: 45, label: "Lunch Break" },
+        ],
+      });
+    } else if (modeParam === "college") {
+      updateConfig({
+        periodsPerDay: 6,
+        periodDuration: 60,
+        labDuration: 120,
+        breaks: [
+          { afterPeriod: 2, duration: 15, label: "Short Break" },
+          { afterPeriod: 4, duration: 60, label: "Lunch Break" },
+        ],
+      });
+    }
+  }, [modeParam, isFlexSecondSetup]);
 
   const handleResendVerification = async () => {
     if (!email) {
@@ -203,6 +233,17 @@ const SetupWizard = () => {
             <span>Review</span>
           </div>
         </div>
+
+        {/* Flex second-setup: show which mode we're configuring */}
+        {isFlexSecondSetup && (
+          <Alert className="mb-6 border-primary bg-primary/5">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <AlertTitle>Complete {modeParam === "college" ? "College" : "School"} setup</AlertTitle>
+            <AlertDescription>
+              You're configuring the {modeParam} mode. Finish this wizard to unlock switching between School and College.
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Email Verification Warning Banner */}
         {!emailVerified && (

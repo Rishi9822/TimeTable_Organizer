@@ -11,6 +11,12 @@ const schema = new mongoose.Schema({
   subject_id: { type: mongoose.Schema.Types.ObjectId, ref: "Subject", required: true },
   class_id: { type: mongoose.Schema.Types.ObjectId, ref: "Class", required: true },
   periods_per_week: { type: Number, default: 4 },
+  // Flex plan: isolates records by mode (school | college)
+  modeType: {
+    type: String,
+    enum: ["school", "college"],
+    default: null,
+  },
 });
 
 schema.method("toJSON", function () {
