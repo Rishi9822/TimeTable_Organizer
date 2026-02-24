@@ -3,6 +3,7 @@ import TeacherClassAssignment from "../models/TeacherClassAssignment.js";
 import Teacher from "../models/Teacher.js";
 import Subject from "../models/Subject.js";
 import Class from "../models/Class.js";
+import Institution from "../models/Institution.js";
 import { logAuditFromRequest } from "../utils/auditLogger.js";
 
 /**
@@ -10,16 +11,17 @@ import { logAuditFromRequest } from "../utils/auditLogger.js";
  */
 export const getTeacherSubjects = async (req, res) => {
   try {
-    // CRITICAL: Filter by institutionId for multi-tenancy
     if (!req.user.institutionId) {
       return res.status(403).json({
         message: "You must be part of an institution to access teacher subjects",
       });
     }
-
-    const data = await TeacherSubject.find({
-      institutionId: req.user.institutionId,
-    });
+    const institution = await Institution.findById(req.user.institutionId);
+    const query = { institutionId: req.user.institutionId };
+    if (institution?.plan === "flex" && institution.activeMode) {
+      query.modeType = institution.activeMode;
+    }
+    const data = await TeacherSubject.find(query);
     res.json(data);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -46,36 +48,35 @@ export const assignTeacherSubject = async (req, res) => {
       });
     }
 
-    const teacher = await Teacher.findOne({
-      _id: teacherId,
-      institutionId: req.user.institutionId,
-    });
+    const institution = await Institution.findById(req.user.institutionId);
+    const baseQuery = { institutionId: req.user.institutionId };
+    const modeFilter = institution?.plan === "flex" && institution.activeMode ? { modeType: institution.activeMode } : {};
+    const teacher = await Teacher.findOne({ _id: teacherId, ...baseQuery, ...modeFilter });
     if (!teacher) {
       return res.status(404).json({ message: "Teacher not found" });
     }
-
-    const subject = await Subject.findOne({
-      _id: subjectId,
-      institutionId: req.user.institutionId,
-    });
+    const subject = await Subject.findOne({ _id: subjectId, ...baseQuery, ...modeFilter });
     if (!subject) {
       return res.status(404).json({ message: "Subject not found" });
     }
-
     const exists = await TeacherSubject.findOne({
       teacherId,
       subjectId,
       institutionId: req.user.institutionId,
+      ...modeFilter,
     });
     if (exists) {
       return res.status(409).json({ message: "Already assigned" });
     }
-
-    const assignment = await TeacherSubject.create({
+    const createPayload = {
       teacherId,
       subjectId,
       institutionId: req.user.institutionId,
-    });
+    };
+    if (institution?.plan === "flex" && institution.activeMode) {
+      createPayload.modeType = institution.activeMode;
+    }
+    const assignment = await TeacherSubject.create(createPayload);
 
     // Audit log: Log AFTER successful assignment
     logAuditFromRequest(
@@ -110,11 +111,12 @@ export const removeTeacherSubject = async (req, res) => {
       });
     }
 
-    const assignment = await TeacherSubject.findOneAndDelete({
-      teacherId,
-      subjectId,
-      institutionId: req.user.institutionId,
-    });
+    const institution = await Institution.findById(req.user.institutionId);
+    const deleteQuery = { teacherId, subjectId, institutionId: req.user.institutionId };
+    if (institution?.plan === "flex" && institution.activeMode) {
+      deleteQuery.modeType = institution.activeMode;
+    }
+    const assignment = await TeacherSubject.findOneAndDelete(deleteQuery);
 
     if (!assignment) {
       return res.status(404).json({ message: "Assignment not found" });
@@ -144,16 +146,17 @@ export const removeTeacherSubject = async (req, res) => {
  */
 export const getTeacherClassAssignments = async (req, res) => {
   try {
-    // CRITICAL: Filter by institutionId for multi-tenancy
     if (!req.user.institutionId) {
       return res.status(403).json({
         message: "You must be part of an institution to access assignments",
       });
     }
-
-    const data = await TeacherClassAssignment.find({
-      institutionId: req.user.institutionId,
-    });
+    const institution = await Institution.findById(req.user.institutionId);
+    const query = { institutionId: req.user.institutionId };
+    if (institution?.plan === "flex" && institution.activeMode) {
+      query.modeType = institution.activeMode;
+    }
+    const data = await TeacherClassAssignment.find(query);
     res.json(data);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -180,34 +183,26 @@ export const assignTeacherClass = async (req, res) => {
       });
     }
 
-    const teacher = await Teacher.findOne({
-      _id: teacher_id,
-      institutionId: req.user.institutionId,
-    });
+    const institution = await Institution.findById(req.user.institutionId);
+    const baseQuery = { institutionId: req.user.institutionId };
+    const modeFilter = institution?.plan === "flex" && institution.activeMode ? { modeType: institution.activeMode } : {};
+    const teacher = await Teacher.findOne({ _id: teacher_id, ...baseQuery, ...modeFilter });
     if (!teacher) {
       return res.status(404).json({ message: "Teacher not found" });
     }
-
-    const subject = await Subject.findOne({
-      _id: subject_id,
-      institutionId: req.user.institutionId,
-    });
+    const subject = await Subject.findOne({ _id: subject_id, ...baseQuery, ...modeFilter });
     if (!subject) {
       return res.status(404).json({ message: "Subject not found" });
     }
-
-    const classEntity = await Class.findOne({
-      _id: class_id,
-      institutionId: req.user.institutionId,
-    });
+    const classEntity = await Class.findOne({ _id: class_id, ...baseQuery, ...modeFilter });
     if (!classEntity) {
       return res.status(404).json({ message: "Class not found" });
     }
-
-    const record = await TeacherClassAssignment.create({
-      ...req.body,
-      institutionId: req.user.institutionId,
-    });
+    const createPayload = { ...req.body, institutionId: req.user.institutionId };
+    if (institution?.plan === "flex" && institution.activeMode) {
+      createPayload.modeType = institution.activeMode;
+    }
+    const record = await TeacherClassAssignment.create(createPayload);
     res.status(201).json(record);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -226,10 +221,12 @@ export const removeTeacherClassAssignment = async (req, res) => {
       });
     }
 
-    const assignment = await TeacherClassAssignment.findOne({
-      _id: req.params.id,
-      institutionId: req.user.institutionId,
-    });
+    const institution = await Institution.findById(req.user.institutionId);
+    const ownershipQuery = { _id: req.params.id, institutionId: req.user.institutionId };
+    if (institution?.plan === "flex" && institution.activeMode) {
+      ownershipQuery.modeType = institution.activeMode;
+    }
+    const assignment = await TeacherClassAssignment.findOne(ownershipQuery);
 
     if (!assignment) {
       return res.status(404).json({ message: "Assignment not found" });

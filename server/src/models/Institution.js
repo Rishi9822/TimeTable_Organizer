@@ -80,6 +80,12 @@ const institutionSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // ONLY for Standard: the locked type value. MUST be null for Flex.
+    lockedInstitutionType: {
+      type: String,
+      enum: ["school", "college"],
+      default: null,
+    },
   },
   { timestamps: true }
 );
@@ -93,9 +99,13 @@ institutionSchema.pre("save", function () {
     this.trialEndsAt = endDate;
   }
 
-  // SaaS Logic: Lock institution type for Standard plan after setup is complete
+  // SaaS Logic: Lock institution type for Standard plan after setup is complete.
+  // Flex must NEVER have lockedInstitutionType set.
   if (this.plan === "standard" && this.isSetupComplete && !this.institutionTypeLocked) {
     this.institutionTypeLocked = true;
+  }
+  if (this.plan === "flex") {
+    this.lockedInstitutionType = null;
   }
 
   // SaaS Logic: For Flex plan, ensure activeMode is set if only one mode is completed

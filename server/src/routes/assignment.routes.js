@@ -4,6 +4,7 @@ import { requireRole } from "../middleware/roleMiddleware.js";
 import { requireWritableInstitution } from "../middleware/institutionStatusMiddleware.js";
 import Assignment from "../models/Assignment.js";
 import Class from "../models/Class.js";
+import Institution from "../models/Institution.js";
 
 import {
   getTeacherSubjects,
@@ -24,31 +25,27 @@ router.get(
   async (req, res) => {
     try {
       const { classId } = req.params;
-
-      // CRITICAL: Verify class belongs to user's institution
       if (!req.user.institutionId) {
         return res.status(403).json({
           message: "You must be part of an institution to access assignments",
         });
       }
-
-      const classEntity = await Class.findOne({
-        _id: classId,
-        institutionId: req.user.institutionId,
-      });
-
+      const institution = await Institution.findById(req.user.institutionId);
+      const classQuery = { _id: classId, institutionId: req.user.institutionId };
+      if (institution?.plan === "flex" && institution.activeMode) {
+        classQuery.modeType = institution.activeMode;
+      }
+      const classEntity = await Class.findOne(classQuery);
       if (!classEntity) {
         return res.status(404).json({ message: "Class not found" });
       }
-
-      // CRITICAL: Filter assignments by institutionId
-      const assignments = await Assignment.find({
-        classId,
-        institutionId: req.user.institutionId,
-      })
+      const assignQuery = { classId, institutionId: req.user.institutionId };
+      if (institution?.plan === "flex" && institution.activeMode) {
+        assignQuery.modeType = institution.activeMode;
+      }
+      const assignments = await Assignment.find(assignQuery)
         .populate("teacherId", "name")
         .populate("subjectId", "name code color periods_per_week");
-
       res.json(assignments);
     } catch (err) {
       console.error("FETCH CLASS ASSIGNMENTS ERROR:", err);

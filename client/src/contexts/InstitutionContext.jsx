@@ -154,10 +154,11 @@ export const InstitutionProvider = ({ children }) => {
     // Ensure periods are generated locally for downstream UI usage
     generatePeriods();
 
-    // Always call backend setup endpoint to mark Institution.isSetupComplete = true
-    // This works for both new institutions (create) and existing ones (update).
+    // Always call backend setup endpoint to mark Institution.isSetupComplete = true.
+    // For Flex second setup, backend uses institution_type to set the completed mode.
     const setupResponse = await api.post("/institutions", {
       institutionName: config.institutionName || "My Institution",
+      institution_type: config.institutionType || undefined,
     });
 
     const finalInstitutionId = setupResponse.data?.institutionId;

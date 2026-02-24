@@ -12,6 +12,12 @@ const subjectSchema = new mongoose.Schema(
     code: { type: String, default: null },
     color: { type: String, required: true },
     periods_per_week: { type: Number, default: 4 },
+    // Flex plan: isolates records by mode (school | college)
+    modeType: {
+      type: String,
+      enum: ["school", "college"],
+      default: null,
+    },
   },
   { timestamps: true }
 );

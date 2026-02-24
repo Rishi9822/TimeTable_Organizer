@@ -1,11 +1,12 @@
 import React from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowRight, CreditCard } from "lucide-react";
 import API from "@/lib/api";
 import { useToast } from "@/hooks/useToast";
+import { useInstitutionInfo } from "@/hooks/useTeachers";
 
 /**
  * PlanUpgradeActions
@@ -16,15 +17,7 @@ import { useToast } from "@/hooks/useToast";
  */
 export const PlanUpgradeActions = () => {
   const { toast } = useToast();
-
-  const { data: institutionInfo, isLoading } = useQuery({
-    queryKey: ["institutionInfo"],
-    queryFn: async () => {
-      const { data } = await API.get("/institutions/info");
-      return data;
-    },
-    staleTime: 60000,
-  });
+  const { data: institutionInfo, isLoading } = useInstitutionInfo();
 
   const upgradeMutation = useMutation({
     mutationFn: async (plan) => {
