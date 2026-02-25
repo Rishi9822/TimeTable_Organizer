@@ -8,8 +8,10 @@ import AuditLog from "../models/AuditLog.js";
  */
 export const getAuditLogs = async (req, res) => {
   try {
+    const targetInstitutionId = req.user.institutionId?._id || req.user.institutionId;
+
     // CRITICAL: Verify user belongs to an institution
-    if (!req.user.institutionId) {
+    if (!targetInstitutionId) {
       return res.status(403).json({
         message: "You must be part of an institution to access audit logs",
       });
@@ -29,7 +31,7 @@ export const getAuditLogs = async (req, res) => {
 
     // Query: Only logs for user's institution, sorted by newest first
     const query = {
-      institutionId: req.user.institutionId,
+      institutionId: targetInstitutionId,
     };
 
     // Optional filter by action type

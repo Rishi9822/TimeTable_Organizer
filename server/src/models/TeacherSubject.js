@@ -29,4 +29,7 @@ const teacherSubjectSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Compound index for mode-aware filtering
+teacherSubjectSchema.index({ institutionId: 1, modeType: 1 });
+
 export default mongoose.model("TeacherSubject", teacherSubjectSchema);

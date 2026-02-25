@@ -15,7 +15,7 @@ import { useInstitutionInfo } from "@/hooks/useTeachers";
  * to upgrade from trial → standard or flex. All enforcement still
  * happens server-side; this component is just a thin UX layer.
  */
-export const PlanUpgradeActions = () => {
+const PlanUpgradeActions = () => {
   const { toast } = useToast();
   const { data: institutionInfo, isLoading } = useInstitutionInfo();
 
@@ -95,9 +95,9 @@ export const PlanUpgradeActions = () => {
             <CreditCard className="h-5 w-5" />
             Subscription
           </CardTitle>
-          <CardDescription>
+          <div className="text-sm text-muted-foreground mt-1.5">
             You are on the <Badge variant="outline">Flex</Badge> plan. All features are enabled.
-          </CardDescription>
+          </div>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
@@ -116,9 +116,9 @@ export const PlanUpgradeActions = () => {
           <CreditCard className="h-5 w-5" />
           Upgrade Plan
         </CardTitle>
-        <CardDescription>
+        <div className="text-sm text-muted-foreground mt-1.5">
           Move from <Badge variant="secondary">{plan}</Badge> to a paid plan using secure Stripe checkout.
-        </CardDescription>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {isTrial && (
@@ -158,4 +158,7 @@ export const PlanUpgradeActions = () => {
       </CardContent>
     </Card>
   );
+
 };
+
+export default PlanUpgradeActions;

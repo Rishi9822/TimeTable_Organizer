@@ -7,7 +7,9 @@ export const getInviteCodes = async (req, res) => {
     const { institutionId } = req.params;
 
     // Ensure admin can only view codes for their own institution
-    if (req.user.institutionId?.toString() !== institutionId?.toString()) {
+    const userInstitutionId = req.user.institutionId?._id?.toString() || req.user.institutionId?.toString();
+
+    if (userInstitutionId !== institutionId?.toString()) {
       return res.status(403).json({
         message: "You can only view invite codes for your own institution",
       });
@@ -30,16 +32,18 @@ export const createInviteCode = async (req, res) => {
   try {
     // CRITICAL: Enforce email verification requirement
     if (!req.user.emailVerified) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         message: "Please verify your email address before creating invite codes. Check your inbox for the verification link.",
-        requiresEmailVerification: true 
+        requiresEmailVerification: true
       });
     }
 
     const { institutionId, maxUses, code: requestedCode } = req.body;
 
     // Ensure admin can only create codes for their own institution
-    if (req.user.institutionId?.toString() !== institutionId?.toString()) {
+    const userInstitutionId = req.user.institutionId?._id?.toString() || req.user.institutionId?.toString();
+
+    if (userInstitutionId !== institutionId?.toString()) {
       return res.status(403).json({
         message: "You can only create invite codes for your own institution",
       });
@@ -51,7 +55,7 @@ export const createInviteCode = async (req, res) => {
       : Math.random().toString(36).substring(2, 8).toUpperCase();
 
     const invite = await InviteCode.create({
-      institutionId: req.user.institutionId,
+      institutionId: userInstitutionId,
       code,
       createdBy: req.user._id,
       maxUses: maxUses || null,
@@ -64,7 +68,7 @@ export const createInviteCode = async (req, res) => {
       "invite_code",
       invite._id,
       { code: invite.code, maxUses: invite.maxUses }
-    ).catch(() => {}); // Silently ignore logging errors
+    ).catch(() => { }); // Silently ignore logging errors
 
     res.status(201).json(invite);
   } catch (error) {
@@ -84,10 +88,12 @@ export const deleteInviteCode = async (req, res) => {
   try {
     const { id } = req.params;
 
+    const userInstitutionId = req.user.institutionId?._id || req.user.institutionId;
+
     // CRITICAL: Verify ownership before delete - ensure invite code belongs to admin's institution
     const inviteCode = await InviteCode.findOne({
       _id: id,
-      institutionId: req.user.institutionId,
+      institutionId: userInstitutionId,
     });
 
     if (!inviteCode) {
@@ -108,7 +114,7 @@ export const deleteInviteCode = async (req, res) => {
       "invite_code",
       id,
       { code: inviteCode.code }
-    ).catch(() => {}); // Silently ignore logging errors
+    ).catch(() => { }); // Silently ignore logging errors
 
     res.json({ success: true, message: "Invite code deleted successfully" });
   } catch (error) {

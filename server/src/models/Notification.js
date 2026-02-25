@@ -43,6 +43,12 @@ const notificationSchema = new mongoose.Schema(
             ref: "User",
             required: true,
         },
+
+        // Lovable Alignment: Track volume of broadcast for history
+        recipientCount: {
+            type: Number,
+            default: 0,
+        },
     },
     { timestamps: true }
 );

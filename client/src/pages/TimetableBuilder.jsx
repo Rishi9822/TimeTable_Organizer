@@ -31,9 +31,11 @@ import { useClasses } from '@/hooks/useTeachers';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTimetableContext } from '@/contexts/TimetableContext';
 import { useDemo } from '@/contexts/DemoContext';
-import { toast } from 'sonner';
+import { useToast } from '@/hooks/useToast';
+import { DashboardLayout } from '@/components/DashboardLayout';
 
 const RealTimetableBuilder = () => {
+  const { toast } = useToast();
   const { hasRole } = useAuth();
   const { data: classes = [] } = useClasses();
   const { loadTimetable, loadAllTimetables, saveTimetable, isLoading, isSaving } = useTimetableContext();
@@ -101,14 +103,15 @@ const RealTimetableBuilder = () => {
     try {
       await saveTimetable(selectedClassId, periods || timetableRef.current?.getPeriods?.());
       setHasUnsavedChanges(false);
-      toast.success('Timetable saved successfully!', {
+      toast({
+        title: 'Timetable saved successfully!',
         description: `Changes for ${selectedClassName} have been saved.`,
-        icon: <CheckCircle className="w-4 h-4" />,
       });
     } catch (error) {
-      toast.error('Failed to save timetable', {
+      toast({
+        title: 'Failed to save timetable',
         description: error.response?.data?.message || 'Please try again.',
-        icon: <AlertCircle className="w-4 h-4" />,
+        variant: 'destructive',
       });
     }
   };
@@ -118,133 +121,113 @@ const RealTimetableBuilder = () => {
   };
 
   const handleExport = () => {
-    toast.info('Export feature coming soon!', {
+    toast({
+      title: 'Export feature coming soon!',
       description: 'PDF and Excel exports will be available in the next update.',
     });
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border/50">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            {/* Left section */}
-            <div className="flex items-center gap-4">
-              <Link to="/">
-                <Button variant="ghost" size="sm" className="gap-2">
-                  <ArrowLeft className="w-4 h-4" />
-                  <span className="hidden sm:inline">Back</span>
-                </Button>
-              </Link>
-              <div className="h-6 w-px bg-border" />
-              <div>
-                <h1 className="text-lg font-semibold text-foreground">Timetable Builder</h1>
-                <p className="text-xs text-muted-foreground hidden sm:block">Drag and drop to create schedules</p>
-              </div>
-            </div>
-
-            {/* Center - Class Selector */}
-            <div className="hidden md:block">
-              <ClassSelector
-                selectedClassId={selectedClassId}
-                onSelectClass={handleSelectClass}
-              />
-            </div>
-
-            {/* Right section */}
-            <div className="flex items-center gap-2">
-              {hasRole(['admin', 'scheduler']) && (
-                <Link to="/teachers">
-                  <Button variant="ghost" size="icon" title="Manage Teachers">
-                    <Users className="w-4 h-4" />
-                  </Button>
-                </Link>
-              )}
-              <Button variant="ghost" size="icon" className="hidden sm:flex">
-                <Undo2 className="w-4 h-4" />
-              </Button>
-              <Button variant="ghost" size="icon" className="hidden sm:flex">
-                <Redo2 className="w-4 h-4" />
-              </Button>
-              <div className="h-6 w-px bg-border hidden sm:block" />
-              <Link to="/setup">
-                <Button variant="ghost" size="icon">
-                  <Settings className="w-4 h-4" />
-                </Button>
-              </Link>
-              <Button variant="outline" size="sm" onClick={handleExport} className="hidden sm:flex gap-2">
-                <Download className="w-4 h-4" />
-                Export
-              </Button>
-              <Button
-                variant="hero"
-                size="sm"
-                onClick={() => handleSave()}
-                disabled={isSaving(selectedClassId) || !hasUnsavedChanges}
-                className="gap-2"
-              >
-                {isSaving(selectedClassId) ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4" />
-                    Save
-                  </>
-                )}
-              </Button>
-              <div className="flex items-center gap-2">
-                <NotificationBell />
-                <UserMenu />
-              </div>
-            </div>
+    <DashboardLayout
+      title="Timetable Builder"
+      subtitle="Drag and drop to create schedules"
+      headerActions={
+        <div className="flex items-center gap-2">
+          <div className="hidden lg:flex items-center gap-1 bg-muted rounded-md p-0.5 mr-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => timetableRef.current?.undo()}
+              disabled={!timetableRef.current?.canUndo}
+              title="Undo"
+            >
+              <Undo2 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => timetableRef.current?.redo()}
+              disabled={!timetableRef.current?.canRedo}
+              title="Redo"
+            >
+              <Redo2 className="h-4 w-4" />
+            </Button>
           </div>
 
-          {/* Mobile class selector */}
-          <div className="md:hidden pb-3">
+          <div className="hidden md:block">
             <ClassSelector
               selectedClassId={selectedClassId}
               onSelectClass={handleSelectClass}
             />
           </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExport}
+            className="gap-2 hidden sm:flex"
+          >
+            <Download className="h-4 w-4" />
+            Export
+          </Button>
+
+          <Button
+            variant="hero"
+            size="sm"
+            onClick={() => handleSave()}
+            disabled={isSaving(selectedClassId) || !hasUnsavedChanges}
+            className="gap-2"
+          >
+            {isSaving(selectedClassId) ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4" />
+                Save
+              </>
+            )}
+          </Button>
         </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {isLoading(selectedClassId) ? (
-          <div className="flex flex-col items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
-            <p className="text-muted-foreground">Loading timetable...</p>
-          </div>
-        ) : selectedClassId ? (
-          <TimetableGrid
-            ref={timetableRef}
-            classId={selectedClassId}
-            className={selectedClassName}
-            onSave={handleSave}
-            onChange={handleTimetableChange}
-            hasUnsavedChanges={hasUnsavedChanges}
-          />
-        ) : (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <AlertCircle className="w-12 h-12 text-muted-foreground mb-4" />
-            <h2 className="text-xl font-semibold text-foreground mb-2">No Classes Available</h2>
-            <p className="text-muted-foreground mb-4">Add a class to start building your timetable</p>
-            <Link to="/teachers">
-              <Button className="gap-2">
-                <Users className="w-4 h-4" />
-                Go to Teacher Management
-              </Button>
-            </Link>
-          </div>
-        )}
-      </main>
-
-      {/* Quick help tooltip */}
+      }
+    >
+      <div className="md:hidden mb-4">
+        <ClassSelector
+          selectedClassId={selectedClassId}
+          onSelectClass={handleSelectClass}
+        />
+      </div>
+      {isLoading(selectedClassId) ? (
+        <div className="flex flex-col items-center justify-center py-20">
+          <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
+          <p className="text-muted-foreground">Loading timetable...</p>
+        </div>
+      ) : selectedClassId ? (
+        <TimetableGrid
+          ref={timetableRef}
+          classId={selectedClassId}
+          className={selectedClassName}
+          onSave={handleSave}
+          onChange={handleTimetableChange}
+          hasUnsavedChanges={hasUnsavedChanges}
+        />
+      ) : (
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <AlertCircle className="w-12 h-12 text-muted-foreground mb-4" />
+          <h2 className="text-xl font-semibold text-foreground mb-2">No Classes Available</h2>
+          <p className="text-muted-foreground mb-4">Add a class to start building your timetable</p>
+          <Link to="/teachers">
+            <Button className="gap-2">
+              <Users className="w-4 h-4" />
+              Go to Teacher Management
+            </Button>
+          </Link>
+        </div>
+      )}
       {selectedClassId && (
         <div className="fixed bottom-6 right-6 z-50">
           <div className="bg-card border border-border/50 rounded-xl p-4 shadow-lg max-w-xs animate-fade-in">
@@ -293,14 +276,14 @@ const RealTimetableBuilder = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </DashboardLayout>
   );
 };
 
 // Demo variant: uses DemoContext classes and fully in-memory TimetableGrid (no backend writes)
 const DemoTimetableBuilder = () => {
+  const { toast } = useToast();
   const { demoClasses, maxDemoClasses } = useDemo();
-
   const [selectedClassId, setSelectedClassId] = useState(
     demoClasses[0]?.id || ''
   );
@@ -353,85 +336,85 @@ const DemoTimetableBuilder = () => {
   const handleSaveDemo = async () => {
     // No backend writes in demo; just clear unsaved flag
     setHasUnsavedChanges(false);
-    toast.info('Changes are kept only for this session in demo mode.', {
-      icon: <AlertCircle className="w-4 h-4" />,
+    toast({
+      title: 'Session saved',
+      description: 'Changes are kept only for this session in demo mode.',
     });
   };
 
   const selectedClass = demoClasses.find((c) => c.id === selectedClassId);
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border/50">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="gap-2"
-                asChild
-              >
-                <Link to="/demo">
-                  <ArrowLeft className="w-4 h-4" />
-                  <span className="hidden sm:inline">Back to Demo</span>
-                </Link>
-              </Button>
-              <div className="h-6 w-px bg-border" />
-              <div>
-                <h1 className="text-lg font-semibold text-foreground">Timetable Builder (Demo)</h1>
-                <p className="text-xs text-muted-foreground hidden sm:block">
-                  Drag and drop to explore the timetable experience. Changes are not saved.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled
-                className="hidden sm:flex gap-2"
-              >
-                <Download className="w-4 h-4" />
-                Export (demo only)
-              </Button>
-              <Button
-                variant="hero"
-                size="sm"
-                onClick={handleSaveDemo}
-                disabled={!hasUnsavedChanges}
-                className="gap-2"
-              >
-                <Save className="w-4 h-4" />
-                Save (Session)
-              </Button>
-            </div>
+    <DashboardLayout
+      title="Timetable Builder (Demo)"
+      subtitle="Drag and drop to explore the experience. Changes are not saved."
+      headerActions={
+        <div className="flex items-center gap-2">
+          <div className="hidden lg:flex items-center gap-1 bg-muted rounded-md p-0.5 mr-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => timetableRef.current?.undo()}
+              disabled={!timetableRef.current?.canUndo}
+              title="Undo"
+            >
+              <Undo2 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => timetableRef.current?.redo()}
+              disabled={!timetableRef.current?.canRedo}
+              title="Redo"
+            >
+              <Redo2 className="h-4 w-4" />
+            </Button>
           </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSaveDemo}
+            className="hidden sm:flex gap-2"
+          >
+            <Download className="w-4 h-4" />
+            Export (demo)
+          </Button>
+
+          <Button
+            variant="hero"
+            size="sm"
+            onClick={handleSaveDemo}
+            disabled={!hasUnsavedChanges}
+            className="gap-2"
+          >
+            <Save className="w-4 h-4" />
+            Save (Session)
+          </Button>
         </div>
-      </header>
-
-      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {selectedClassId ? (
-          <TimetableGrid
-            ref={timetableRef}
-            isDemoMode={true}
-            classId={selectedClassId}
-            className={selectedClass?.name || selectedClassId}
-            onSave={handleSaveDemo}
-            onChange={handleTimetableChange}
-            hasUnsavedChanges={hasUnsavedChanges}
-          />
-        ) : (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <AlertCircle className="w-12 h-12 text-muted-foreground mb-4" />
-            <h2 className="text-xl font-semibold text-foreground mb-2">No demo classes available</h2>
-            <p className="text-muted-foreground">
-              Use the demo start screen to create sample classes.
-            </p>
-          </div>
-        )}
-      </main>
+      }
+    >
+      {selectedClassId ? (
+        <TimetableGrid
+          ref={timetableRef}
+          isDemoMode={true}
+          classId={selectedClassId}
+          className={selectedClass?.name || selectedClassId}
+          onSave={handleSaveDemo}
+          onChange={handleTimetableChange}
+          hasUnsavedChanges={hasUnsavedChanges}
+        />
+      ) : (
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <AlertCircle className="w-12 h-12 text-muted-foreground mb-4" />
+          <h2 className="text-xl font-semibold text-foreground mb-2">No demo classes available</h2>
+          <p className="text-muted-foreground">
+            Use the demo start screen to create sample classes.
+          </p>
+        </div>
+      )}
 
       <AlertDialog open={showUnsavedDialog} onOpenChange={setShowUnsavedDialog}>
         <AlertDialogContent>
@@ -450,7 +433,7 @@ const DemoTimetableBuilder = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </DashboardLayout>
   );
 };
 

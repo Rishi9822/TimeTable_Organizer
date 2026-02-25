@@ -5,13 +5,14 @@ import { hasReachedClassLimit, getPlanLimits } from "../utils/planLimits.js";
 
 export const getClasses = async (req, res) => {
   try {
-    if (!req.user.institutionId) {
+    const targetInstitutionId = req.user.institutionId?._id || req.user.institutionId;
+    if (!targetInstitutionId) {
       return res.status(403).json({
         message: "You must be part of an institution to access classes",
       });
     }
-    const institution = await Institution.findById(req.user.institutionId);
-    const query = { institutionId: req.user.institutionId };
+    const institution = await Institution.findById(targetInstitutionId);
+    const query = { institutionId: targetInstitutionId };
     if (institution?.plan === "flex" && institution.activeMode) {
       query.modeType = institution.activeMode;
     } else if (req.query.institution_type) {
@@ -26,19 +27,20 @@ export const getClasses = async (req, res) => {
 
 export const createClass = async (req, res) => {
   try {
+    const targetInstitutionId = req.user.institutionId?._id || req.user.institutionId;
     // CRITICAL: Ensure user belongs to an institution
-    if (!req.user.institutionId) {
+    if (!targetInstitutionId) {
       return res.status(403).json({
         message: "You must be part of an institution to create classes",
       });
     }
 
     // Check plan limits (only for trial plan, paid plans have no limits)
-    const institution = await Institution.findById(req.user.institutionId);
+    const institution = await Institution.findById(targetInstitutionId);
     if (institution && institution.plan === "trial") {
       // Only enforce limits for trial plan
       const currentClassCount = await Class.countDocuments({
-        institutionId: req.user.institutionId,
+        institutionId: targetInstitutionId,
       });
 
       if (hasReachedClassLimit(institution.plan, currentClassCount)) {
@@ -52,7 +54,7 @@ export const createClass = async (req, res) => {
         });
       }
     }
-    const createPayload = { ...req.body, institutionId: req.user.institutionId };
+    const createPayload = { ...req.body, institutionId: targetInstitutionId };
     if (institution?.plan === "flex" && institution.activeMode) {
       createPayload.modeType = institution.activeMode;
     }
@@ -65,7 +67,7 @@ export const createClass = async (req, res) => {
       "class",
       cls._id,
       { className: cls.name, section: cls.section }
-    ).catch(() => {}); // Silently ignore logging errors
+    ).catch(() => { }); // Silently ignore logging errors
 
     res.status(201).json(cls);
   } catch (err) {
@@ -75,8 +77,9 @@ export const createClass = async (req, res) => {
 
 export const deleteClass = async (req, res) => {
   try {
-    const institution = await Institution.findById(req.user.institutionId);
-    const ownershipQuery = { _id: req.params.id, institutionId: req.user.institutionId };
+    const targetInstitutionId = req.user.institutionId?._id || req.user.institutionId;
+    const institution = await Institution.findById(targetInstitutionId);
+    const ownershipQuery = { _id: req.params.id, institutionId: targetInstitutionId };
     if (institution?.plan === "flex" && institution.activeMode) {
       ownershipQuery.modeType = institution.activeMode;
     }
@@ -95,7 +98,7 @@ export const deleteClass = async (req, res) => {
       "class",
       req.params.id,
       { className: cls.name, section: cls.section }
-    ).catch(() => {}); // Silently ignore logging errors
+    ).catch(() => { }); // Silently ignore logging errors
 
     res.json({ success: true });
   } catch (err) {

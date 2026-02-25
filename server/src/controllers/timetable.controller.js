@@ -11,16 +11,17 @@ import { logAuditFromRequest } from "../utils/auditLogger.js";
  */
 export const getAllTimetables = async (req, res) => {
   try {
-    if (!req.user.institutionId) {
+    const targetInstitutionId = req.user.institutionId?._id || req.user.institutionId;
+    if (!targetInstitutionId) {
       return res.status(403).json({
         message: "You must be part of an institution to access timetables",
       });
     }
-    const institution = await Institution.findById(req.user.institutionId);
+    const institution = await Institution.findById(targetInstitutionId);
     const now = new Date();
     const year = now.getFullYear();
     const academicYear = `${year}-${year + 1}`;
-    const query = { institutionId: req.user.institutionId, academicYear };
+    const query = { institutionId: targetInstitutionId, academicYear };
     if (institution?.plan === "flex" && institution.activeMode) {
       query.modeType = institution.activeMode;
     }
@@ -50,14 +51,15 @@ export const getTimetable = async (req, res) => {
     const { classId } = req.params;
 
     // CRITICAL: Verify class belongs to user's institution
-    if (!req.user.institutionId) {
+    const targetInstitutionId = req.user.institutionId?._id || req.user.institutionId;
+    if (!targetInstitutionId) {
       return res.status(403).json({
         message: "You must be part of an institution to access timetables",
       });
     }
 
-    const institution = await Institution.findById(req.user.institutionId);
-    const classQuery = { _id: classId, institutionId: req.user.institutionId };
+    const institution = await Institution.findById(targetInstitutionId);
+    const classQuery = { _id: classId, institutionId: targetInstitutionId };
     if (institution?.plan === "flex" && institution.activeMode) {
       classQuery.modeType = institution.activeMode;
     }
@@ -68,7 +70,7 @@ export const getTimetable = async (req, res) => {
     const now = new Date();
     const year = now.getFullYear();
     const academicYear = `${year}-${year + 1}`;
-    const ttQuery = { classId, institutionId: req.user.institutionId, academicYear };
+    const ttQuery = { classId, institutionId: targetInstitutionId, academicYear };
     if (institution?.plan === "flex" && institution.activeMode) {
       ttQuery.modeType = institution.activeMode;
     }
@@ -110,15 +112,16 @@ export const saveTimetable = async (req, res) => {
     const { classId } = req.params;
     const { periods, weekStructure, academicYear } = req.body;
 
+    const targetInstitutionId = req.user.institutionId?._id || req.user.institutionId;
     // CRITICAL: Verify class belongs to user's institution
-    if (!req.user.institutionId) {
+    if (!targetInstitutionId) {
       return res.status(403).json({
         message: "You must be part of an institution to save timetables",
       });
     }
 
-    const institution = await Institution.findById(req.user.institutionId);
-    const classQuery = { _id: classId, institutionId: req.user.institutionId };
+    const institution = await Institution.findById(targetInstitutionId);
+    const classQuery = { _id: classId, institutionId: targetInstitutionId };
     if (institution?.plan === "flex" && institution.activeMode) {
       classQuery.modeType = institution.activeMode;
     }
@@ -132,7 +135,7 @@ export const saveTimetable = async (req, res) => {
     const now = new Date();
     const year = now.getFullYear();
     const finalAcademicYear = academicYear || `${year}-${year + 1}`;
-    const ttQuery = { classId, institutionId: req.user.institutionId, academicYear: finalAcademicYear, isPublished: false };
+    const ttQuery = { classId, institutionId: targetInstitutionId, academicYear: finalAcademicYear, isPublished: false };
     if (institution?.plan === "flex" && institution.activeMode) {
       ttQuery.modeType = institution.activeMode;
     }
@@ -153,10 +156,10 @@ export const saveTimetable = async (req, res) => {
       const periodsMap = periods && typeof periods === 'object' && !(periods instanceof Map)
         ? new Map(Object.entries(periods))
         : (periods || new Map());
-      
+
       const createPayload = {
         classId,
-        institutionId: req.user.institutionId,
+        institutionId: targetInstitutionId,
         academicYear: finalAcademicYear,
         weekStructure: weekStructure || "Mon-Fri",
         periods: periodsMap,
@@ -182,7 +185,7 @@ export const saveTimetable = async (req, res) => {
       "timetable",
       timetable._id,
       { className: classEntity.name, classId: classId, academicYear: finalAcademicYear }
-    ).catch(() => {}); // Silently ignore logging errors
+    ).catch(() => { }); // Silently ignore logging errors
 
     res.json(response);
   } catch (error) {
@@ -207,15 +210,17 @@ export const publishTimetable = async (req, res) => {
   try {
     const { classId } = req.params;
 
+    const targetInstitutionId = req.user.institutionId?._id || req.user.institutionId;
+
     // CRITICAL: Verify class belongs to user's institution
-    if (!req.user.institutionId) {
+    if (!targetInstitutionId) {
       return res.status(403).json({
         message: "You must be part of an institution to publish timetables",
       });
     }
 
-    const institution = await Institution.findById(req.user.institutionId);
-    const classQuery = { _id: classId, institutionId: req.user.institutionId };
+    const institution = await Institution.findById(targetInstitutionId);
+    const classQuery = { _id: classId, institutionId: targetInstitutionId };
     if (institution?.plan === "flex" && institution.activeMode) {
       classQuery.modeType = institution.activeMode;
     }
@@ -226,7 +231,7 @@ export const publishTimetable = async (req, res) => {
     const now = new Date();
     const year = now.getFullYear();
     const academicYear = `${year}-${year + 1}`;
-    const ttQuery = { classId, institutionId: req.user.institutionId, academicYear, isPublished: false };
+    const ttQuery = { classId, institutionId: targetInstitutionId, academicYear, isPublished: false };
     if (institution?.plan === "flex" && institution.activeMode) {
       ttQuery.modeType = institution.activeMode;
     }
@@ -238,7 +243,7 @@ export const publishTimetable = async (req, res) => {
       });
     }
 
-    const unpublishQuery = { classId, institutionId: req.user.institutionId, academicYear, isPublished: true };
+    const unpublishQuery = { classId, institutionId: targetInstitutionId, academicYear, isPublished: true };
     if (institution?.plan === "flex" && institution.activeMode) {
       unpublishQuery.modeType = institution.activeMode;
     }
@@ -261,7 +266,7 @@ export const publishTimetable = async (req, res) => {
       "timetable",
       draft._id,
       { className: classEntity.name, classId: classId, academicYear }
-    ).catch(() => {}); // Silently ignore logging errors
+    ).catch(() => { }); // Silently ignore logging errors
 
     res.json({
       message: "Timetable published successfully",
@@ -281,15 +286,17 @@ export const detectConflicts = async (req, res) => {
   try {
     const { classId } = req.params;
 
+    const targetInstitutionId = req.user.institutionId?._id || req.user.institutionId;
+
     // CRITICAL: Verify class belongs to user's institution
-    if (!req.user.institutionId) {
+    if (!targetInstitutionId) {
       return res.status(403).json({
         message: "You must be part of an institution to check conflicts",
       });
     }
 
-    const institution = await Institution.findById(req.user.institutionId);
-    const classQuery = { _id: classId, institutionId: req.user.institutionId };
+    const institution = await Institution.findById(targetInstitutionId);
+    const classQuery = { _id: classId, institutionId: targetInstitutionId };
     if (institution?.plan === "flex" && institution.activeMode) {
       classQuery.modeType = institution.activeMode;
     }
@@ -300,7 +307,7 @@ export const detectConflicts = async (req, res) => {
     const now = new Date();
     const year = now.getFullYear();
     const academicYear = `${year}-${year + 1}`;
-    const ttQuery = { classId, institutionId: req.user.institutionId, academicYear, isPublished: false };
+    const ttQuery = { classId, institutionId: targetInstitutionId, academicYear, isPublished: false };
     if (institution?.plan === "flex" && institution.activeMode) {
       ttQuery.modeType = institution.activeMode;
     }
@@ -308,12 +315,12 @@ export const detectConflicts = async (req, res) => {
     if (!timetable || !timetable.periods) {
       return res.json({ conflicts: [], warnings: [] });
     }
-    const allTtQuery = { institutionId: req.user.institutionId, academicYear };
+    const allTtQuery = { institutionId: targetInstitutionId, academicYear };
     if (institution?.plan === "flex" && institution.activeMode) {
       allTtQuery.modeType = institution.activeMode;
     }
     const allTimetables = await Timetable.find(allTtQuery).populate("classId", "name section");
-    const teacherQuery = { institutionId: req.user.institutionId };
+    const teacherQuery = { institutionId: targetInstitutionId };
     if (institution?.plan === "flex" && institution.activeMode) {
       teacherQuery.modeType = institution.activeMode;
     }

@@ -11,13 +11,14 @@ import { logAuditFromRequest } from "../utils/auditLogger.js";
  */
 export const getTeacherSubjects = async (req, res) => {
   try {
-    if (!req.user.institutionId) {
+    const targetInstitutionId = req.user.institutionId?._id || req.user.institutionId;
+    if (!targetInstitutionId) {
       return res.status(403).json({
         message: "You must be part of an institution to access teacher subjects",
       });
     }
-    const institution = await Institution.findById(req.user.institutionId);
-    const query = { institutionId: req.user.institutionId };
+    const institution = await Institution.findById(targetInstitutionId);
+    const query = { institutionId: targetInstitutionId };
     if (institution?.plan === "flex" && institution.activeMode) {
       query.modeType = institution.activeMode;
     }
@@ -41,15 +42,16 @@ export const assignTeacherSubject = async (req, res) => {
       });
     }
 
+    const targetInstitutionId = req.user.institutionId?._id || req.user.institutionId;
     // CRITICAL: Verify both teacher and subject belong to user's institution
-    if (!req.user.institutionId) {
+    if (!targetInstitutionId) {
       return res.status(403).json({
         message: "You must be part of an institution to assign subjects",
       });
     }
 
-    const institution = await Institution.findById(req.user.institutionId);
-    const baseQuery = { institutionId: req.user.institutionId };
+    const institution = await Institution.findById(targetInstitutionId);
+    const baseQuery = { institutionId: targetInstitutionId };
     const modeFilter = institution?.plan === "flex" && institution.activeMode ? { modeType: institution.activeMode } : {};
     const teacher = await Teacher.findOne({ _id: teacherId, ...baseQuery, ...modeFilter });
     if (!teacher) {
@@ -62,7 +64,7 @@ export const assignTeacherSubject = async (req, res) => {
     const exists = await TeacherSubject.findOne({
       teacherId,
       subjectId,
-      institutionId: req.user.institutionId,
+      institutionId: targetInstitutionId,
       ...modeFilter,
     });
     if (exists) {
@@ -71,7 +73,7 @@ export const assignTeacherSubject = async (req, res) => {
     const createPayload = {
       teacherId,
       subjectId,
-      institutionId: req.user.institutionId,
+      institutionId: targetInstitutionId,
     };
     if (institution?.plan === "flex" && institution.activeMode) {
       createPayload.modeType = institution.activeMode;
@@ -85,7 +87,7 @@ export const assignTeacherSubject = async (req, res) => {
       "teacher_subject",
       assignment._id,
       { teacherName: teacher.name, subjectName: subject.name }
-    ).catch(() => {}); // Silently ignore logging errors
+    ).catch(() => { }); // Silently ignore logging errors
 
     res.status(201).json(assignment);
   } catch (err) {
@@ -104,15 +106,16 @@ export const removeTeacherSubject = async (req, res) => {
       return res.status(400).json({ message: "Missing IDs" });
     }
 
+    const targetInstitutionId = req.user.institutionId?._id || req.user.institutionId;
     // CRITICAL: Verify ownership before delete
-    if (!req.user.institutionId) {
+    if (!targetInstitutionId) {
       return res.status(403).json({
         message: "You must be part of an institution to remove assignments",
       });
     }
 
-    const institution = await Institution.findById(req.user.institutionId);
-    const deleteQuery = { teacherId, subjectId, institutionId: req.user.institutionId };
+    const institution = await Institution.findById(targetInstitutionId);
+    const deleteQuery = { teacherId, subjectId, institutionId: targetInstitutionId };
     if (institution?.plan === "flex" && institution.activeMode) {
       deleteQuery.modeType = institution.activeMode;
     }
@@ -133,7 +136,7 @@ export const removeTeacherSubject = async (req, res) => {
       "teacher_subject",
       assignment._id,
       { teacherName: teacher?.name, subjectName: subject?.name }
-    ).catch(() => {}); // Silently ignore logging errors
+    ).catch(() => { }); // Silently ignore logging errors
 
     res.json({ message: "Subject removed from teacher" });
   } catch (err) {
@@ -146,13 +149,14 @@ export const removeTeacherSubject = async (req, res) => {
  */
 export const getTeacherClassAssignments = async (req, res) => {
   try {
-    if (!req.user.institutionId) {
+    const targetInstitutionId = req.user.institutionId?._id || req.user.institutionId;
+    if (!targetInstitutionId) {
       return res.status(403).json({
         message: "You must be part of an institution to access assignments",
       });
     }
-    const institution = await Institution.findById(req.user.institutionId);
-    const query = { institutionId: req.user.institutionId };
+    const institution = await Institution.findById(targetInstitutionId);
+    const query = { institutionId: targetInstitutionId };
     if (institution?.plan === "flex" && institution.activeMode) {
       query.modeType = institution.activeMode;
     }
@@ -176,15 +180,16 @@ export const assignTeacherClass = async (req, res) => {
       });
     }
 
+    const targetInstitutionId = req.user.institutionId?._id || req.user.institutionId;
     // CRITICAL: Verify all entities belong to user's institution
-    if (!req.user.institutionId) {
+    if (!targetInstitutionId) {
       return res.status(403).json({
         message: "You must be part of an institution to create assignments",
       });
     }
 
-    const institution = await Institution.findById(req.user.institutionId);
-    const baseQuery = { institutionId: req.user.institutionId };
+    const institution = await Institution.findById(targetInstitutionId);
+    const baseQuery = { institutionId: targetInstitutionId };
     const modeFilter = institution?.plan === "flex" && institution.activeMode ? { modeType: institution.activeMode } : {};
     const teacher = await Teacher.findOne({ _id: teacher_id, ...baseQuery, ...modeFilter });
     if (!teacher) {
@@ -198,7 +203,7 @@ export const assignTeacherClass = async (req, res) => {
     if (!classEntity) {
       return res.status(404).json({ message: "Class not found" });
     }
-    const createPayload = { ...req.body, institutionId: req.user.institutionId };
+    const createPayload = { ...req.body, institutionId: targetInstitutionId };
     if (institution?.plan === "flex" && institution.activeMode) {
       createPayload.modeType = institution.activeMode;
     }
@@ -214,15 +219,16 @@ export const assignTeacherClass = async (req, res) => {
  */
 export const removeTeacherClassAssignment = async (req, res) => {
   try {
+    const targetInstitutionId = req.user.institutionId?._id || req.user.institutionId;
     // CRITICAL: Verify ownership before delete
-    if (!req.user.institutionId) {
+    if (!targetInstitutionId) {
       return res.status(403).json({
         message: "You must be part of an institution to delete assignments",
       });
     }
 
-    const institution = await Institution.findById(req.user.institutionId);
-    const ownershipQuery = { _id: req.params.id, institutionId: req.user.institutionId };
+    const institution = await Institution.findById(targetInstitutionId);
+    const ownershipQuery = { _id: req.params.id, institutionId: targetInstitutionId };
     if (institution?.plan === "flex" && institution.activeMode) {
       ownershipQuery.modeType = institution.activeMode;
     }

@@ -42,7 +42,7 @@ export const getPlanLimits = (plan = "trial") => {
  */
 export const isActionAllowed = (plan, action) => {
   const limits = getPlanLimits(plan);
-  
+
   switch (action) {
     case "export":
       return limits.allowExports;
@@ -100,8 +100,8 @@ export const canSwitchInstitutionType = (institution, newType, settings) => {
 
   const currentType = settings?.institution_type;
 
-  // If type hasn't changed, allow
-  if (currentType === newType) {
+  // If type hasn't changed, OR if first-time setting (no current type), allow
+  if (currentType === newType || !currentType) {
     return { allowed: true };
   }
 
@@ -120,7 +120,7 @@ export const canSwitchInstitutionType = (institution, newType, settings) => {
   // Flex plan: Can switch only after both modes are completed
   if (institution.plan === "flex") {
     const completedModes = institution.completedModes || [];
-    
+
     // Check if both modes are completed
     const hasSchool = completedModes.includes("school");
     const hasCollege = completedModes.includes("college");
@@ -168,10 +168,12 @@ export const canCompleteModeSetup = (institution, mode) => {
   }
 
   const completedModes = institution.completedModes || [];
-  
+
   // Check if mode is already completed
+  // Note: We'll handle idempotency in the controller to avoid blocking re-runs
+  // that might be needed after partial failures.
   if (completedModes.includes(mode)) {
-    return { allowed: false, reason: `Mode "${mode}" is already set up` };
+    return { allowed: true };
   }
 
   // Flex plan allows up to 2 modes (school and college)

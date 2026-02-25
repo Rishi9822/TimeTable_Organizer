@@ -4,13 +4,14 @@ import { logAuditFromRequest } from "../utils/auditLogger.js";
 
 export const getSubjects = async (req, res) => {
   try {
-    if (!req.user.institutionId) {
+    const targetInstitutionId = req.user.institutionId?._id || req.user.institutionId;
+    if (!targetInstitutionId) {
       return res.status(403).json({
         message: "You must be part of an institution to access subjects",
       });
     }
-    const institution = await Institution.findById(req.user.institutionId);
-    const query = { institutionId: req.user.institutionId };
+    const institution = await Institution.findById(targetInstitutionId);
+    const query = { institutionId: targetInstitutionId };
     if (institution?.plan === "flex" && institution.activeMode) {
       query.modeType = institution.activeMode;
     }
@@ -23,13 +24,14 @@ export const getSubjects = async (req, res) => {
 
 export const createSubject = async (req, res) => {
   try {
-    if (!req.user.institutionId) {
+    const targetInstitutionId = req.user.institutionId?._id || req.user.institutionId;
+    if (!targetInstitutionId) {
       return res.status(403).json({
         message: "You must be part of an institution to create subjects",
       });
     }
-    const institution = await Institution.findById(req.user.institutionId);
-    const createPayload = { ...req.body, institutionId: req.user.institutionId };
+    const institution = await Institution.findById(targetInstitutionId);
+    const createPayload = { ...req.body, institutionId: targetInstitutionId };
     if (institution?.plan === "flex" && institution.activeMode) {
       createPayload.modeType = institution.activeMode;
     }
@@ -42,7 +44,7 @@ export const createSubject = async (req, res) => {
       "subject",
       subject._id,
       { subjectName: subject.name, subjectCode: subject.code }
-    ).catch(() => {}); // Silently ignore logging errors
+    ).catch(() => { }); // Silently ignore logging errors
 
     res.status(201).json(subject);
   } catch (err) {
@@ -52,8 +54,9 @@ export const createSubject = async (req, res) => {
 
 export const deleteSubject = async (req, res) => {
   try {
-    const institution = await Institution.findById(req.user.institutionId);
-    const ownershipQuery = { _id: req.params.id, institutionId: req.user.institutionId };
+    const targetInstitutionId = req.user.institutionId?._id || req.user.institutionId;
+    const institution = await Institution.findById(targetInstitutionId);
+    const ownershipQuery = { _id: req.params.id, institutionId: targetInstitutionId };
     if (institution?.plan === "flex" && institution.activeMode) {
       ownershipQuery.modeType = institution.activeMode;
     }
@@ -72,7 +75,7 @@ export const deleteSubject = async (req, res) => {
       "subject",
       req.params.id,
       { subjectName: subject.name, subjectCode: subject.code }
-    ).catch(() => {}); // Silently ignore logging errors
+    ).catch(() => { }); // Silently ignore logging errors
 
     res.json({ success: true });
   } catch (err) {

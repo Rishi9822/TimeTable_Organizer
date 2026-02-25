@@ -6,7 +6,7 @@ import { Calendar, Building2, Clock, Package, School, GraduationCap } from "luci
 import { useInstitutionInfo, useSwitchMode } from "@/hooks/useTeachers";
 import { useToast } from "@/hooks/useToast";
 
-export const InstitutionPlanCard = () => {
+const InstitutionPlanCard = () => {
   const { data: institutionInfo, isLoading } = useInstitutionInfo();
   const switchMode = useSwitchMode();
   const { toast } = useToast();
@@ -135,7 +135,10 @@ export const InstitutionPlanCard = () => {
       </CardContent>
     </Card>
   );
+
 };
+
+export default InstitutionPlanCard;
 
 
 

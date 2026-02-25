@@ -19,6 +19,9 @@ const schema = new mongoose.Schema({
   },
 });
 
+// Compound index for mode-aware filtering
+schema.index({ institutionId: 1, modeType: 1 });
+
 schema.method("toJSON", function () {
   const { _id, __v, ...obj } = this.toObject();
   obj.id = _id;

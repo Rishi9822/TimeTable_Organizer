@@ -90,6 +90,9 @@ const institutionSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+institutionSchema.index({ plan: 1 });
+institutionSchema.index({ status: 1 });
+
 // Calculate trialEndsAt before save (synchronous document middleware)
 institutionSchema.pre("save", function () {
   // Only set trialEndsAt if this is a new trial institution

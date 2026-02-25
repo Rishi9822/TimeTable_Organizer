@@ -8,15 +8,16 @@ import { logAuditFromRequest } from "../utils/auditLogger.js";
 
 export const getTeachers = async (req, res) => {
   try {
+    const targetInstitutionId = req.user.institutionId?._id || req.user.institutionId;
     // CRITICAL: Filter by institutionId for multi-tenancy
-    if (!req.user.institutionId) {
+    if (!targetInstitutionId) {
       return res.status(403).json({
         message: "You must be part of an institution to access teachers",
       });
     }
 
-    const institution = await Institution.findById(req.user.institutionId);
-    const query = { institutionId: req.user.institutionId };
+    const institution = await Institution.findById(targetInstitutionId);
+    const query = { institutionId: targetInstitutionId };
     if (institution?.plan === "flex" && institution.activeMode) {
       query.modeType = institution.activeMode;
     }
@@ -29,17 +30,18 @@ export const getTeachers = async (req, res) => {
 
 export const createTeacher = async (req, res) => {
   try {
+    const targetInstitutionId = req.user.institutionId?._id || req.user.institutionId;
     // CRITICAL: Ensure user belongs to an institution
-    if (!req.user.institutionId) {
+    if (!targetInstitutionId) {
       return res.status(403).json({
         message: "You must be part of an institution to create teachers",
       });
     }
 
-    const institution = await Institution.findById(req.user.institutionId);
+    const institution = await Institution.findById(targetInstitutionId);
     if (institution && institution.plan === "trial") {
       const currentTeacherCount = await Teacher.countDocuments({
-        institutionId: req.user.institutionId,
+        institutionId: targetInstitutionId,
       });
 
       if (hasReachedTeacherLimit(institution.plan, currentTeacherCount)) {
@@ -56,7 +58,7 @@ export const createTeacher = async (req, res) => {
     // CRITICAL: Force institutionId from authenticated user; Flex: set modeType for isolation
     const createPayload = {
       ...req.body,
-      institutionId: req.user.institutionId,
+      institutionId: targetInstitutionId,
     };
     if (institution?.plan === "flex" && institution.activeMode) {
       createPayload.modeType = institution.activeMode;
@@ -70,7 +72,7 @@ export const createTeacher = async (req, res) => {
       "teacher",
       teacher._id,
       { teacherName: teacher.name }
-    ).catch(() => {}); // Silently ignore logging errors
+    ).catch(() => { }); // Silently ignore logging errors
 
     res.status(201).json(teacher);
   } catch (err) {
@@ -80,8 +82,9 @@ export const createTeacher = async (req, res) => {
 
 export const updateTeacher = async (req, res) => {
   try {
-    const institution = await Institution.findById(req.user.institutionId);
-    const ownershipQuery = { _id: req.params.id, institutionId: req.user.institutionId };
+    const targetInstitutionId = req.user.institutionId?._id || req.user.institutionId;
+    const institution = await Institution.findById(targetInstitutionId);
+    const ownershipQuery = { _id: req.params.id, institutionId: targetInstitutionId };
     if (institution?.plan === "flex" && institution.activeMode) {
       ownershipQuery.modeType = institution.activeMode;
     }
@@ -108,7 +111,7 @@ export const updateTeacher = async (req, res) => {
       "teacher",
       updated._id,
       { teacherName: updated.name }
-    ).catch(() => {}); // Silently ignore logging errors
+    ).catch(() => { }); // Silently ignore logging errors
 
     res.json(updated);
   } catch (err) {
@@ -125,9 +128,10 @@ export const updateTeacher = async (req, res) => {
  */
 export const deleteTeacher = async (req, res) => {
   try {
+    const targetInstitutionId = req.user.institutionId?._id || req.user.institutionId;
     const teacherId = req.params.id;
-    const institution = await Institution.findById(req.user.institutionId);
-    const ownershipQuery = { _id: teacherId, institutionId: req.user.institutionId };
+    const institution = await Institution.findById(targetInstitutionId);
+    const ownershipQuery = { _id: teacherId, institutionId: targetInstitutionId };
     if (institution?.plan === "flex" && institution.activeMode) {
       ownershipQuery.modeType = institution.activeMode;
     }
@@ -141,17 +145,17 @@ export const deleteTeacher = async (req, res) => {
     // 1. Delete teacher-subject mappings
     await TeacherSubject.deleteMany({
       teacherId,
-      institutionId: req.user.institutionId,
+      institutionId: targetInstitutionId,
     });
 
     // 2. Delete teacher-class assignments
     await TeacherClassAssignment.deleteMany({
       teacher_id: teacherId,
-      institutionId: req.user.institutionId,
+      institutionId: targetInstitutionId,
     });
 
     // 3. Remove teacher references from all timetables (same mode for Flex)
-    const timetableQuery = { institutionId: req.user.institutionId };
+    const timetableQuery = { institutionId: targetInstitutionId };
     if (institution?.plan === "flex" && institution.activeMode) {
       timetableQuery.modeType = institution.activeMode;
     }
@@ -203,7 +207,7 @@ export const deleteTeacher = async (req, res) => {
       "teacher",
       teacherId,
       { teacherName: teacher.name }
-    ).catch(() => {}); // Silently ignore logging errors
+    ).catch(() => { }); // Silently ignore logging errors
 
     res.json({
       success: true,

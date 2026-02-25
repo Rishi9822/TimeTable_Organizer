@@ -3,7 +3,42 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import API from "@/lib/api";
-import { useToast } from "@/hooks/useToast";
+import { toast } from "sonner";
+import {
+    Shield,
+    Building2,
+    Users as UsersIcon,
+    CreditCard,
+    Bell,
+    CheckCircle2,
+    PauseCircle,
+    PlayCircle,
+    Trash2,
+    Ban,
+    UserCheck,
+    Send,
+    History,
+    ChevronRight,
+    TrendingUp,
+    AlertCircle,
+    Calendar,
+    Plus
+} from "lucide-react";
+import { DashboardLayout } from "@/components/DashboardLayout";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 const saApi = {
@@ -25,14 +60,10 @@ const saApi = {
     sendNotification: (data) => API.post("/super-admin/notifications/send", data),
 };
 
-const TABS = ["Overview", "Tenants", "Users", "Subscriptions", "Notifications"];
-
 export default function SuperAdminDashboard() {
     const { role } = useAuth();
     const navigate = useNavigate();
-    const [activeTab, setActiveTab] = useState("Overview");
     const qc = useQueryClient();
-    const { toast } = useToast();
 
     // Redirect non-super-admins
     if (role && role !== "super_admin") {
@@ -41,45 +72,53 @@ export default function SuperAdminDashboard() {
     }
 
     return (
-        <div style={{ minHeight: "100vh", background: "#0f1117", color: "#e2e8f0", fontFamily: "Inter, sans-serif" }}>
-            {/* Header */}
-            <div style={{ background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)", padding: "24px 40px", borderBottom: "1px solid rgba(99,102,241,0.3)" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                    <div style={{ width: 40, height: 40, borderRadius: 10, background: "linear-gradient(135deg, #6366f1, #8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>🛡️</div>
-                    <div>
-                        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#c7d2fe" }}>Super Admin Dashboard</h1>
-                        <p style={{ margin: 0, fontSize: 13, color: "#818cf8" }}>Platform-wide management console</p>
-                    </div>
-                </div>
+        <DashboardLayout
+            title="Super Admin Dashboard"
+            subtitle="Platform-wide management and monitoring console"
+        >
+            <Tabs defaultValue="Overview" className="space-y-6">
+                <TabsList className="bg-background/50 border border-border/50 p-1">
+                    <TabsTrigger value="Overview" className="gap-2">
+                        <TrendingUp className="w-4 h-4" />
+                        Overview
+                    </TabsTrigger>
+                    <TabsTrigger value="Tenants" className="gap-2">
+                        <Building2 className="w-4 h-4" />
+                        Tenants
+                    </TabsTrigger>
+                    <TabsTrigger value="Users" className="gap-2">
+                        <UsersIcon className="w-4 h-4" />
+                        Users
+                    </TabsTrigger>
+                    <TabsTrigger value="Subscriptions" className="gap-2">
+                        <CreditCard className="w-4 h-4" />
+                        Subscriptions
+                    </TabsTrigger>
+                    <TabsTrigger value="Notifications" className="gap-2">
+                        <Bell className="w-4 h-4" />
+                        Notifications
+                    </TabsTrigger>
+                </TabsList>
 
-                {/* Tabs */}
-                <div style={{ display: "flex", gap: 4, marginTop: 24 }}>
-                    {TABS.map((tab) => (
-                        <button
-                            key={tab}
-                            onClick={() => setActiveTab(tab)}
-                            style={{
-                                padding: "8px 20px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 600, fontSize: 14, transition: "all 0.15s",
-                                background: activeTab === tab ? "rgba(99,102,241,0.3)" : "transparent",
-                                color: activeTab === tab ? "#a5b4fc" : "#64748b",
-                                borderBottom: activeTab === tab ? "2px solid #6366f1" : "2px solid transparent",
-                            }}
-                        >
-                            {tab}
-                        </button>
-                    ))}
+                <div className="mt-6">
+                    <TabsContent value="Overview">
+                        <OverviewTab />
+                    </TabsContent>
+                    <TabsContent value="Tenants">
+                        <TenantsTab qc={qc} />
+                    </TabsContent>
+                    <TabsContent value="Users">
+                        <UsersTab qc={qc} />
+                    </TabsContent>
+                    <TabsContent value="Subscriptions">
+                        <SubsTab qc={qc} />
+                    </TabsContent>
+                    <TabsContent value="Notifications">
+                        <NotificationsTab />
+                    </TabsContent>
                 </div>
-            </div>
-
-            {/* Content */}
-            <div style={{ padding: "32px 40px" }}>
-                {activeTab === "Overview" && <OverviewTab />}
-                {activeTab === "Tenants" && <TenantsTab qc={qc} />}
-                {activeTab === "Users" && <UsersTab qc={qc} />}
-                {activeTab === "Subscriptions" && <SubsTab qc={qc} />}
-                {activeTab === "Notifications" && <NotificationsTab />}
-            </div>
-        </div>
+            </Tabs>
+        </DashboardLayout>
     );
 }
 
@@ -89,29 +128,39 @@ function OverviewTab() {
 
     const cards = stats
         ? [
-            { label: "Total Orgs", value: stats.total_orgs, icon: "🏛️", color: "#6366f1" },
-            { label: "Active", value: stats.active_orgs, icon: "✅", color: "#10b981" },
-            { label: "Suspended", value: stats.suspended_orgs, icon: "⏸️", color: "#f59e0b" },
-            { label: "Total Users", value: stats.total_users, icon: "👥", color: "#3b82f6" },
-            { label: "Trial Plans", value: stats.trial_subs, icon: "🔬", color: "#8b5cf6" },
-            { label: "Standard Plans", value: stats.standard_subs, icon: "⭐", color: "#06b6d4" },
-            { label: "Flex Plans", value: stats.flex_subs, icon: "🔄", color: "#ec4899" },
+            { label: "Total Orgs", value: stats.total_orgs, icon: <Building2 className="w-6 h-6 text-indigo-400" />, color: "border-indigo-500/30" },
+            { label: "Active", value: stats.active_orgs, icon: <CheckCircle2 className="w-6 h-6 text-emerald-400" />, color: "border-emerald-500/30" },
+            { label: "Suspended", value: stats.suspended_orgs, icon: <PauseCircle className="w-6 h-6 text-amber-400" />, color: "border-amber-500/30" },
+            { label: "Total Users", value: stats.total_users, icon: <UsersIcon className="w-6 h-6 text-blue-400" />, color: "border-blue-500/30" },
+            { label: "Trial Plans", value: stats.trial_subs, icon: <Shield className="w-6 h-6 text-purple-400" />, color: "border-purple-500/30" },
+            { label: "Standard Plans", value: stats.standard_subs, icon: <CreditCard className="w-6 h-6 text-cyan-400" />, color: "border-cyan-500/30" },
+            { label: "Flex Plans", value: stats.flex_subs, icon: <TrendingUp className="w-6 h-6 text-pink-400" />, color: "border-pink-500/30" },
         ]
         : [];
 
     return (
-        <div>
-            <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 20, color: "#c7d2fe" }}>Platform Overview</h2>
+        <div className="space-y-6">
+            <h2 className="text-xl font-bold tracking-tight text-foreground">Platform Overview</h2>
             {isLoading ? (
-                <p style={{ color: "#64748b" }}>Loading stats…</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {[...Array(7)].map((_, i) => (
+                        <div key={i} className="h-32 rounded-xl bg-muted animate-pulse" />
+                    ))}
+                </div>
             ) : (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 16 }}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     {cards.map((c) => (
-                        <div key={c.label} style={{ background: "rgba(30,27,75,0.6)", border: `1px solid ${c.color}40`, borderRadius: 12, padding: "20px", textAlign: "center" }}>
-                            <div style={{ fontSize: 28, marginBottom: 8 }}>{c.icon}</div>
-                            <div style={{ fontSize: 32, fontWeight: 800, color: c.color }}>{c.value ?? "—"}</div>
-                            <div style={{ fontSize: 13, color: "#94a3b8", marginTop: 4 }}>{c.label}</div>
-                        </div>
+                        <Card key={c.label} className={`bg-card/40 backdrop-blur-sm border-l-4 ${c.color} hover:bg-card/60 transition-colors cursor-default`}>
+                            <CardContent className="pt-6">
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="p-2 rounded-lg bg-background/50 border border-border/50">
+                                        {c.icon}
+                                    </div>
+                                    <span className="text-3xl font-bold leading-none">{c.value ?? "—"}</span>
+                                </div>
+                                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">{c.label}</p>
+                            </CardContent>
+                        </Card>
                     ))}
                 </div>
             )}
@@ -125,49 +174,135 @@ function TenantsTab({ qc }) {
 
     const suspend = useMutation({
         mutationFn: (id) => saApi.suspendInstitution(id),
-        onSuccess: () => { qc.invalidateQueries(["sa-institutions"]); qc.invalidateQueries(["sa-stats"]); },
+        onSuccess: () => {
+            qc.invalidateQueries(["sa-institutions"]);
+            qc.invalidateQueries(["sa-stats"]);
+            toast.success("Institution suspended");
+        },
     });
+
     const activate = useMutation({
         mutationFn: (id) => saApi.activateInstitution(id),
-        onSuccess: () => { qc.invalidateQueries(["sa-institutions"]); qc.invalidateQueries(["sa-stats"]); },
+        onSuccess: () => {
+            qc.invalidateQueries(["sa-institutions"]);
+            qc.invalidateQueries(["sa-stats"]);
+            toast.success("Institution activated");
+        },
     });
+
     const archive = useMutation({
         mutationFn: (id) => saApi.deleteInstitution(id),
-        onSuccess: () => { qc.invalidateQueries(["sa-institutions"]); qc.invalidateQueries(["sa-stats"]); },
+        onSuccess: () => {
+            qc.invalidateQueries(["sa-institutions"]);
+            qc.invalidateQueries(["sa-stats"]);
+            toast.success("Institution archived");
+        },
     });
 
-    const STATUS_COLORS = { active: "#10b981", suspended: "#f59e0b", trial: "#8b5cf6", archived: "#64748b" };
+    const getStatusBadge = (status) => {
+        switch (status) {
+            case "active": return <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 px-2 py-0 border capitalize">{status}</Badge>;
+            case "suspended": return <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/20 px-2 py-0 border capitalize">{status}</Badge>;
+            case "trial": return <Badge variant="outline" className="bg-purple-500/10 text-purple-500 border-purple-500/20 px-2 py-0 border capitalize">{status}</Badge>;
+            default: return <Badge variant="outline" className="bg-muted text-muted-foreground px-2 py-0 border capitalize">{status}</Badge>;
+        }
+    };
 
     return (
-        <div>
-            <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 20, color: "#c7d2fe" }}>All Tenants</h2>
-            {isLoading ? <p style={{ color: "#64748b" }}>Loading…</p> : (
-                <TableWrapper>
-                    <thead>
-                        <tr style={{ borderBottom: "1px solid rgba(99,102,241,0.2)" }}>
-                            {["Name", "Status", "Plan", "Admin", "Created", "Actions"].map((h) => <Th key={h}>{h}</Th>)}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {(institutions || []).map((inst) => (
-                            <tr key={inst._id} style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                                <Td>{inst.name}</Td>
-                                <Td><Badge color={STATUS_COLORS[inst.status] || "#64748b"}>{inst.status}</Badge></Td>
-                                <Td><Badge color="#6366f1">{inst.plan || "—"}</Badge></Td>
-                                <Td style={{ fontSize: 12 }}>{inst.admin?.email || "—"}</Td>
-                                <Td style={{ fontSize: 12 }}>{new Date(inst.createdAt).toLocaleDateString()}</Td>
-                                <Td>
-                                    <div style={{ display: "flex", gap: 6 }}>
-                                        {inst.status !== "active" && <ActionBtn color="#10b981" onClick={() => activate.mutate(inst._id)}>Activate</ActionBtn>}
-                                        {inst.status === "active" && <ActionBtn color="#f59e0b" onClick={() => suspend.mutate(inst._id)}>Suspend</ActionBtn>}
-                                        {inst.status !== "archived" && <ActionBtn color="#ef4444" onClick={() => { if (window.confirm("Archive this institution?")) archive.mutate(inst._id); }}>Archive</ActionBtn>}
-                                    </div>
-                                </Td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </TableWrapper>
-            )}
+        <div className="space-y-4">
+            <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold tracking-tight text-foreground">All Tenants</h2>
+                <Badge variant="hero" className="px-3">{institutions?.length || 0} Total</Badge>
+            </div>
+
+            <Card className="bg-card/40 backdrop-blur-sm border-border/50">
+                <div className="overflow-x-auto">
+                    <Table>
+                        <TableHeader className="bg-muted/30">
+                            <TableRow className="hover:bg-transparent">
+                                <TableHead className="font-semibold text-foreground">Name</TableHead>
+                                <TableHead className="font-semibold text-foreground">Status</TableHead>
+                                <TableHead className="font-semibold text-foreground">Plan</TableHead>
+                                <TableHead className="font-semibold text-foreground">Admin</TableHead>
+                                <TableHead className="font-semibold text-foreground">Created</TableHead>
+                                <TableHead className="font-semibold text-foreground text-right px-6">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {isLoading ? (
+                                [...Array(5)].map((_, i) => (
+                                    <TableRow key={i}>
+                                        <TableCell colSpan={6} className="h-16 bg-muted/10 animate-pulse" />
+                                    </TableRow>
+                                ))
+                            ) : (institutions || []).map((inst) => (
+                                <TableRow key={inst._id} className="group border-b border-border/30 hover:bg-muted/20 transition-colors">
+                                    <TableCell className="font-medium text-foreground py-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-500 border border-indigo-500/20">
+                                                <Building2 className="w-4 h-4" />
+                                            </div>
+                                            {inst.name}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>{getStatusBadge(inst.status)}</TableCell>
+                                    <TableCell>
+                                        <Badge variant="secondary" className="px-2 py-0 uppercase text-[10px] tracking-wider font-bold">
+                                            {inst.plan || "—"}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-muted-foreground text-xs font-mono">
+                                        {inst.admin?.email || "—"}
+                                    </TableCell>
+                                    <TableCell className="text-muted-foreground text-xs">
+                                        {new Date(inst.createdAt).toLocaleDateString()}
+                                    </TableCell>
+                                    <TableCell className="text-right px-6">
+                                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            {inst.status !== "active" && (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-8 border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/10 hover:border-emerald-500/30 gap-1"
+                                                    onClick={() => activate.mutate(inst._id)}
+                                                    disabled={activate.isPending}
+                                                >
+                                                    <PlayCircle className="w-3.5 h-3.5" />
+                                                    Activate
+                                                </Button>
+                                            )}
+                                            {inst.status === "active" && (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-8 border-amber-500/20 text-amber-500 hover:bg-amber-500/10 hover:border-amber-500/30 gap-1"
+                                                    onClick={() => suspend.mutate(inst._id)}
+                                                    disabled={suspend.isPending}
+                                                >
+                                                    <PauseCircle className="w-3.5 h-3.5" />
+                                                    Suspend
+                                                </Button>
+                                            )}
+                                            {inst.status !== "archived" && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-8 text-destructive hover:bg-destructive/10 hover:text-destructive gap-1"
+                                                    onClick={() => { if (window.confirm("Archive this institution?")) archive.mutate(inst._id); }}
+                                                    disabled={archive.isPending}
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                    Archive
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
+            </Card>
         </div>
     );
 }
@@ -176,50 +311,127 @@ function TenantsTab({ qc }) {
 function UsersTab({ qc }) {
     const { data: users, isLoading } = useQuery({ queryKey: ["sa-users"], queryFn: saApi.getUsers });
 
-    const block = useMutation({ mutationFn: (id) => saApi.blockUser(id), onSuccess: () => qc.invalidateQueries(["sa-users"]) });
-    const unblock = useMutation({ mutationFn: (id) => saApi.unblockUser(id), onSuccess: () => qc.invalidateQueries(["sa-users"]) });
-    const changeRole = useMutation({ mutationFn: ({ id, role }) => saApi.changeRole(id, role), onSuccess: () => qc.invalidateQueries(["sa-users"]) });
+    const block = useMutation({
+        mutationFn: (id) => saApi.blockUser(id),
+        onSuccess: () => {
+            qc.invalidateQueries(["sa-users"]);
+            toast.success("User blocked");
+        }
+    });
+
+    const unblock = useMutation({
+        mutationFn: (id) => saApi.unblockUser(id),
+        onSuccess: () => {
+            qc.invalidateQueries(["sa-users"]);
+            toast.success("User unblocked");
+        }
+    });
+
+    const changeRole = useMutation({
+        mutationFn: ({ id, role }) => saApi.changeRole(id, role),
+        onSuccess: () => {
+            qc.invalidateQueries(["sa-users"]);
+            toast.success("User role updated");
+        }
+    });
 
     const ROLES = ["admin", "scheduler", "teacher", "student"];
-    const ROLE_COLORS = { admin: "#6366f1", scheduler: "#3b82f6", teacher: "#10b981", student: "#94a3b8" };
 
     return (
-        <div>
-            <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 20, color: "#c7d2fe" }}>All Users</h2>
-            {isLoading ? <p style={{ color: "#64748b" }}>Loading…</p> : (
-                <TableWrapper>
-                    <thead>
-                        <tr style={{ borderBottom: "1px solid rgba(99,102,241,0.2)" }}>
-                            {["Name", "Email", "Role", "Institution", "Status", "Actions"].map((h) => <Th key={h}>{h}</Th>)}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {(users || []).map((u) => (
-                            <tr key={u._id} style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                                <Td>{u.name}</Td>
-                                <Td style={{ fontSize: 12, color: "#94a3b8" }}>{u.email}</Td>
-                                <Td>
-                                    <select
-                                        value={u.role}
-                                        onChange={(e) => changeRole.mutate({ id: u._id, role: e.target.value })}
-                                        style={{ background: "#1e1b4b", color: ROLE_COLORS[u.role] || "#e2e8f0", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 6, padding: "4px 8px", fontSize: 12, cursor: "pointer" }}
-                                    >
-                                        {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
-                                    </select>
-                                </Td>
-                                <Td style={{ fontSize: 12 }}>{u.institutionName || "—"}</Td>
-                                <Td><Badge color={u.isBlocked ? "#ef4444" : "#10b981"}>{u.isBlocked ? "Blocked" : "Active"}</Badge></Td>
-                                <Td>
-                                    {u.isBlocked
-                                        ? <ActionBtn color="#10b981" onClick={() => unblock.mutate(u._id)}>Unblock</ActionBtn>
-                                        : <ActionBtn color="#ef4444" onClick={() => block.mutate(u._id)}>Block</ActionBtn>
-                                    }
-                                </Td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </TableWrapper>
-            )}
+        <div className="space-y-4">
+            <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold tracking-tight text-foreground">All Users</h2>
+                <Badge variant="hero" className="px-3">{users?.length || 0} Total</Badge>
+            </div>
+
+            <Card className="bg-card/40 backdrop-blur-sm border-border/50">
+                <div className="overflow-x-auto">
+                    <Table>
+                        <TableHeader className="bg-muted/30">
+                            <TableRow className="hover:bg-transparent">
+                                <TableHead className="font-semibold text-foreground">User</TableHead>
+                                <TableHead className="font-semibold text-foreground">Role</TableHead>
+                                <TableHead className="font-semibold text-foreground">Institution</TableHead>
+                                <TableHead className="font-semibold text-foreground">Status</TableHead>
+                                <TableHead className="font-semibold text-foreground text-right px-6">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {isLoading ? (
+                                [...Array(5)].map((_, i) => (
+                                    <TableRow key={i}>
+                                        <TableCell colSpan={5} className="h-16 bg-muted/10 animate-pulse" />
+                                    </TableRow>
+                                ))
+                            ) : (users || []).map((u) => (
+                                <TableRow key={u._id} className="group border-b border-border/30 hover:bg-muted/20 transition-colors">
+                                    <TableCell className="py-4">
+                                        <div className="flex flex-col">
+                                            <span className="font-semibold text-foreground flex items-center gap-2">
+                                                {u.name}
+                                            </span>
+                                            <span className="text-muted-foreground text-xs font-mono">{u.email}</span>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <select
+                                            value={u.role}
+                                            onChange={(e) => changeRole.mutate({ id: u._id, role: e.target.value })}
+                                            className="bg-background/80 border border-border/50 rounded-lg py-1 px-3 text-sm focus:ring-2 focus:ring-primary/40 focus:outline-none transition-all cursor-pointer hover:bg-background"
+                                        >
+                                            {ROLES.map((r) => <option key={r} value={r} className="bg-background capitalize">{r}</option>)}
+                                        </select>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex items-center gap-2 text-muted-foreground">
+                                            <Building2 className="w-3.5 h-3.5" />
+                                            <span className="text-sm truncate max-w-[150px]">{u.institutionName || "—"}</span>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge
+                                            variant="outline"
+                                            className={u.isBlocked
+                                                ? "bg-destructive/10 text-destructive border-destructive/20"
+                                                : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                                            }
+                                        >
+                                            {u.isBlocked ? "Blocked" : "Active"}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-right px-6">
+                                        <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                            {u.isBlocked ? (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-8 border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/10 gap-1.5"
+                                                    onClick={() => unblock.mutate(u._id)}
+                                                    disabled={unblock.isPending}
+                                                >
+                                                    <UserCheck className="w-3.5 h-3.5" />
+                                                    Unblock
+                                                </Button>
+                                            ) : (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-8 text-destructive hover:bg-destructive/10 gap-1.5"
+                                                    onClick={() => { if (window.confirm("Block this user?")) block.mutate(u._id); }}
+                                                    disabled={block.isPending}
+                                                >
+                                                    <Ban className="w-3.5 h-3.5" />
+                                                    Block
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
+            </Card>
         </div>
     );
 }
@@ -229,63 +441,136 @@ function SubsTab({ qc }) {
     const { data: subs, isLoading } = useQuery({ queryKey: ["sa-subs"], queryFn: saApi.getSubscriptions });
     const [extendDays, setExtendDays] = useState({});
 
-    const extendTrial = useMutation({ mutationFn: ({ institutionId, days }) => saApi.extendTrial(institutionId, days), onSuccess: () => qc.invalidateQueries(["sa-subs"]) });
-    const updatePlan = useMutation({ mutationFn: ({ institutionId, plan }) => saApi.updatePlan(institutionId, plan), onSuccess: () => qc.invalidateQueries(["sa-subs"]) });
-    const cancelSub = useMutation({ mutationFn: (id) => saApi.cancelSub(id), onSuccess: () => qc.invalidateQueries(["sa-subs"]) });
+    const extendTrial = useMutation({
+        mutationFn: ({ institutionId, days }) => saApi.extendTrial(institutionId, days),
+        onSuccess: () => {
+            qc.invalidateQueries(["sa-subs"]);
+            toast.success("Trial extended successfully");
+        }
+    });
 
-    const PLAN_COLORS = { trial: "#8b5cf6", standard: "#06b6d4", flex: "#ec4899" };
-    const STATUS_COLORS = { active: "#10b981", expired: "#ef4444", cancelled: "#f59e0b" };
+    const updatePlan = useMutation({
+        mutationFn: ({ institutionId, plan }) => saApi.updatePlan(institutionId, plan),
+        onSuccess: () => {
+            qc.invalidateQueries(["sa-subs"]);
+            toast.success("Subscription plan updated");
+        }
+    });
+
+    const cancelSub = useMutation({
+        mutationFn: (id) => saApi.cancelSub(id),
+        onSuccess: () => {
+            qc.invalidateQueries(["sa-subs"]);
+            toast.success("Subscription cancelled");
+        }
+    });
+
+    const getPlanBadge = (plan) => {
+        switch (plan) {
+            case "flex": return <Badge variant="outline" className="bg-pink-500/10 text-pink-500 border-pink-500/20 uppercase font-bold text-[10px] tracking-widest">{plan}</Badge>;
+            case "standard": return <Badge variant="outline" className="bg-cyan-500/10 text-cyan-500 border-cyan-500/20 uppercase font-bold text-[10px] tracking-widest">{plan}</Badge>;
+            default: return <Badge variant="outline" className="bg-purple-500/10 text-purple-500 border-purple-500/20 uppercase font-bold text-[10px] tracking-widest">{plan}</Badge>;
+        }
+    };
 
     return (
-        <div>
-            <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 20, color: "#c7d2fe" }}>All Subscriptions</h2>
-            {isLoading ? <p style={{ color: "#64748b" }}>Loading…</p> : (
-                <TableWrapper>
-                    <thead>
-                        <tr style={{ borderBottom: "1px solid rgba(99,102,241,0.2)" }}>
-                            {["Institution", "Plan", "Status", "Trial Ends", "Actions"].map((h) => <Th key={h}>{h}</Th>)}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {(subs || []).map((s) => (
-                            <tr key={s._id} style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                                <Td>{s.institutionName}</Td>
-                                <Td>
-                                    <select
-                                        value={s.plan}
-                                        onChange={(e) => updatePlan.mutate({ institutionId: s.institutionId, plan: e.target.value })}
-                                        style={{ background: "#1e1b4b", color: PLAN_COLORS[s.plan] || "#e2e8f0", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 6, padding: "4px 8px", fontSize: 12, cursor: "pointer" }}
-                                    >
-                                        {["trial", "standard", "flex"].map((p) => <option key={p} value={p}>{p}</option>)}
-                                    </select>
-                                </Td>
-                                <Td><Badge color={STATUS_COLORS[s.status] || "#64748b"}>{s.status}</Badge></Td>
-                                <Td style={{ fontSize: 12 }}>{s.trialEndsAt ? new Date(s.trialEndsAt).toLocaleDateString() : "—"}</Td>
-                                <Td>
-                                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                                        {s.plan === "trial" && (
-                                            <>
-                                                <input
+        <div className="space-y-4">
+            <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold tracking-tight text-foreground">Subscriptions</h2>
+                <Badge variant="hero" className="px-3">{subs?.length || 0} Total</Badge>
+            </div>
+
+            <Card className="bg-card/40 backdrop-blur-sm border-border/50">
+                <div className="overflow-x-auto">
+                    <Table>
+                        <TableHeader className="bg-muted/30">
+                            <TableRow className="hover:bg-transparent">
+                                <TableHead className="font-semibold text-foreground">Institution</TableHead>
+                                <TableHead className="font-semibold text-foreground">Current Plan</TableHead>
+                                <TableHead className="font-semibold text-foreground">Status</TableHead>
+                                <TableHead className="font-semibold text-foreground">Trial Ends</TableHead>
+                                <TableHead className="font-semibold text-foreground text-right px-6">Manage</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {isLoading ? (
+                                [...Array(5)].map((_, i) => (
+                                    <TableRow key={i}>
+                                        <TableCell colSpan={5} className="h-16 bg-muted/10 animate-pulse" />
+                                    </TableRow>
+                                ))
+                            ) : (subs || []).map((s) => (
+                                <TableRow key={s._id} className="group border-b border-border/30 hover:bg-muted/20 transition-colors">
+                                    <TableCell className="py-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-500 border border-indigo-500/20">
+                                                <Building2 className="w-4 h-4" />
+                                            </div>
+                                            <span className="font-medium text-foreground">{s.institutionName}</span>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <select
+                                            value={s.plan}
+                                            onChange={(e) => updatePlan.mutate({ institutionId: s.institutionId, plan: e.target.value })}
+                                            className="bg-background/80 border border-border/50 rounded-lg py-1 px-3 text-sm focus:ring-2 focus:ring-primary/40 focus:outline-none transition-all cursor-pointer hover:bg-background"
+                                        >
+                                            {["trial", "standard", "flex"].map((p) => <option key={p} value={p} className="bg-background capitalize">{p}</option>)}
+                                        </select>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge variant="outline" className={s.status === "active" ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-muted text-muted-foreground"}>
+                                            {s.status}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-muted-foreground text-xs">
+                                        {s.trialEndsAt ? (
+                                            <div className="flex items-center gap-2">
+                                                <Calendar className="w-3.5 h-3.5" />
+                                                {new Date(s.trialEndsAt).toLocaleDateString()}
+                                            </div>
+                                        ) : "—"}
+                                    </TableCell>
+                                    <TableCell className="text-right px-6">
+                                        <div className="flex items-center justify-end gap-3">
+                                            <div className="flex items-center gap-2">
+                                                <Input
                                                     type="number"
-                                                    min={1}
-                                                    placeholder="days"
+                                                    placeholder="Days"
+                                                    className="w-20 h-8 text-xs px-2"
                                                     value={extendDays[s._id] || ""}
                                                     onChange={(e) => setExtendDays((prev) => ({ ...prev, [s._id]: e.target.value }))}
-                                                    style={{ width: 60, background: "#1e1b4b", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 6, padding: "4px 6px", color: "#e2e8f0", fontSize: 12 }}
                                                 />
-                                                <ActionBtn color="#6366f1" onClick={() => extendTrial.mutate({ institutionId: s.institutionId, days: Number(extendDays[s._id] || 7) })}>+Days</ActionBtn>
-                                            </>
-                                        )}
-                                        {s.status !== "cancelled" && (
-                                            <ActionBtn color="#ef4444" onClick={() => { if (window.confirm("Cancel subscription?")) cancelSub.mutate(s.institutionId); }}>Cancel</ActionBtn>
-                                        )}
-                                    </div>
-                                </Td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </TableWrapper>
-            )}
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-8 gap-1"
+                                                    onClick={() => extendTrial.mutate({ institutionId: s.institutionId, days: Number(extendDays[s._id] || 7) })}
+                                                    disabled={extendTrial.isPending}
+                                                >
+                                                    <Plus className="w-3.5 h-3.5" />
+                                                    <span className="hidden sm:inline">Extend</span>
+                                                </Button>
+                                            </div>
+                                            {s.status !== "cancelled" && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-8 text-destructive hover:bg-destructive/10"
+                                                    onClick={() => { if (window.confirm("Cancel subscription?")) cancelSub.mutate(s.institutionId); }}
+                                                    disabled={cancelSub.isPending}
+                                                >
+                                                    Cancel
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
+            </Card>
         </div>
     );
 }
@@ -305,116 +590,162 @@ function NotificationsTab() {
             await saApi.sendNotification(form);
             qc.invalidateQueries(["sa-notifs"]);
             setForm({ title: "", message: "", channel: "in_app", audienceType: "all_users", audienceId: "" });
-            toast({ title: "Notification sent", description: "All recipients have been notified.", variant: "default" });
+            toast.success("Notification sent successfully");
         } catch (e) {
-            toast({ title: "Error sending notification", description: e.response?.data?.message || "Something went wrong", variant: "destructive" });
+            toast.error(e.response?.data?.message || "Failed to send notification");
         } finally {
             setSending(false);
         }
     };
 
-    const inputStyle = { width: "100%", background: "#1e1b4b", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 8, padding: "10px 12px", color: "#e2e8f0", fontSize: 14, boxSizing: "border-box" };
-    const labelStyle = { display: "block", fontSize: 12, color: "#94a3b8", marginBottom: 6, fontWeight: 600 };
-    const CHANNEL_OPTIONS = ["in_app", "email", "both"];
-    const AUDIENCE_OPTIONS = ["all_users", "all_tenants", "institution", "user"];
+    const CHANNEL_OPTIONS = [{ val: "in_app", lbl: "In-App Dashboard" }, { val: "email", lbl: "Direct Email" }, { val: "both", lbl: "Both" }];
+    const AUDIENCE_OPTIONS = [
+        { val: "all_users", lbl: "All Active Users" },
+        { val: "all_tenants", lbl: "All Admin Users (Tenants)" },
+        { val: "institution", lbl: "Specific Institution" },
+        { val: "user", lbl: "Specific User" }
+    ];
 
     return (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 32 }}>
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
             {/* Compose */}
-            <div style={{ background: "rgba(30,27,75,0.6)", border: "1px solid rgba(99,102,241,0.2)", borderRadius: 16, padding: 24 }}>
-                <h3 style={{ margin: "0 0 20px 0", color: "#c7d2fe", fontSize: 16 }}>📢 Compose Notification</h3>
-                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                    <div>
-                        <label style={labelStyle}>Title</label>
-                        <input style={inputStyle} value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))} placeholder="Notification title" />
+            <Card className="bg-card/40 backdrop-blur-sm border-border/50 h-fit">
+                <CardHeader>
+                    <CardTitle className="text-xl flex items-center gap-2">
+                        <Send className="w-5 h-5 text-primary" />
+                        Compose Notification
+                    </CardTitle>
+                    <CardDescription>Send targeted broadccast or direct notifications to users.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                        <Label>Notification Title</Label>
+                        <Input
+                            value={form.title}
+                            onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
+                            placeholder="e.g. Platform Maintenance Notice"
+                            className="bg-background/50"
+                        />
                     </div>
-                    <div>
-                        <label style={labelStyle}>Message</label>
-                        <textarea style={{ ...inputStyle, minHeight: 80, resize: "vertical" }} value={form.message} onChange={(e) => setForm((p) => ({ ...p, message: e.target.value }))} placeholder="Notification message" />
+                    <div className="space-y-2">
+                        <Label>Detailed Message</Label>
+                        <textarea
+                            className="w-full bg-background/50 border border-border/50 rounded-lg p-3 min-h-[120px] text-sm focus:ring-2 focus:ring-primary/40 focus:outline-none transition-all placeholder:text-muted-foreground"
+                            value={form.message}
+                            onChange={(e) => setForm((p) => ({ ...p, message: e.target.value }))}
+                            placeholder="Write your announcement here..."
+                        />
                     </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                        <div>
-                            <label style={labelStyle}>Channel</label>
-                            <select style={inputStyle} value={form.channel} onChange={(e) => setForm((p) => ({ ...p, channel: e.target.value }))}>
-                                {CHANNEL_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label>Delivery Channel</Label>
+                            <select
+                                className="w-full bg-background/50 border border-border/50 rounded-lg h-10 px-3 text-sm focus:ring-2 focus:ring-primary/40 focus:outline-none transition-all cursor-pointer"
+                                value={form.channel}
+                                onChange={(e) => setForm((p) => ({ ...p, channel: e.target.value }))}
+                            >
+                                {CHANNEL_OPTIONS.map((c) => <option key={c.val} value={c.val} className="bg-background">{c.lbl}</option>)}
                             </select>
                         </div>
-                        <div>
-                            <label style={labelStyle}>Audience Type</label>
-                            <select style={inputStyle} value={form.audienceType} onChange={(e) => setForm((p) => ({ ...p, audienceType: e.target.value }))}>
-                                {AUDIENCE_OPTIONS.map((a) => <option key={a} value={a}>{a}</option>)}
+                        <div className="space-y-2">
+                            <Label>Target Audience</Label>
+                            <select
+                                className="w-full bg-background/50 border border-border/50 rounded-lg h-10 px-3 text-sm focus:ring-2 focus:ring-primary/40 focus:outline-none transition-all cursor-pointer"
+                                value={form.audienceType}
+                                onChange={(e) => setForm((p) => ({ ...p, audienceType: e.target.value }))}
+                            >
+                                {AUDIENCE_OPTIONS.map((a) => <option key={a.val} value={a.val} className="bg-background">{a.lbl}</option>)}
                             </select>
                         </div>
                     </div>
                     {(form.audienceType === "institution" || form.audienceType === "user") && (
-                        <div>
-                            <label style={labelStyle}>Audience ID ({form.audienceType} MongoDB ID)</label>
-                            <input style={inputStyle} value={form.audienceId} onChange={(e) => setForm((p) => ({ ...p, audienceId: e.target.value }))} placeholder="MongoDB ObjectId" />
+                        <div className="space-y-2 pt-2 animate-in slide-in-from-top-4 duration-300">
+                            <Label>Recipient ID (MongoDB ObjectId)</Label>
+                            <Input
+                                value={form.audienceId}
+                                onChange={(e) => setForm((p) => ({ ...p, audienceId: e.target.value }))}
+                                placeholder="Paste the target ID here..."
+                                className="bg-background/80 font-mono text-xs"
+                            />
                         </div>
                     )}
-                    <button
+                    <Button
+                        className="w-full mt-4 h-11 font-bold tracking-wide"
+                        variant="hero"
                         onClick={send}
                         disabled={sending || !form.title || !form.message}
-                        style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)", color: "#fff", border: "none", borderRadius: 8, padding: "12px", fontWeight: 700, cursor: sending ? "not-allowed" : "pointer", opacity: sending ? 0.7 : 1, fontSize: 14 }}
                     >
-                        {sending ? "Sending…" : "Send Notification"}
-                    </button>
-                </div>
-            </div>
+                        {sending ? (
+                            <div className="flex items-center gap-2">
+                                <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                                Processing...
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-2">
+                                <Send className="w-4 h-4" />
+                                Send Notification
+                            </div>
+                        )}
+                    </Button>
+                </CardContent>
+            </Card>
 
             {/* History */}
-            <div style={{ background: "rgba(30,27,75,0.6)", border: "1px solid rgba(99,102,241,0.2)", borderRadius: 16, padding: 24, overflowY: "auto", maxHeight: 600 }}>
-                <h3 style={{ margin: "0 0 20px 0", color: "#c7d2fe", fontSize: 16 }}>📋 Notification History</h3>
-                {(history || []).length === 0 ? (
-                    <p style={{ color: "#64748b", textAlign: "center", marginTop: 40 }}>No notifications sent yet</p>
-                ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                        {(history || []).map((n) => (
-                            <div key={n._id} style={{ background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.2)", borderRadius: 10, padding: 14 }}>
-                                <div style={{ fontWeight: 700, fontSize: 14, color: "#c7d2fe" }}>{n.title}</div>
-                                <div style={{ fontSize: 13, color: "#94a3b8", marginTop: 4 }}>{n.message}</div>
-                                <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-                                    <Badge color="#6366f1">{n.channel}</Badge>
-                                    <Badge color="#8b5cf6">{n.audienceType}</Badge>
-                                    <span style={{ fontSize: 11, color: "#64748b", marginLeft: "auto" }}>{new Date(n.createdAt).toLocaleString()}</span>
-                                </div>
-                            </div>
-                        ))}
+            <Card className="bg-card/40 backdrop-blur-sm border-border/50">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                    <div>
+                        <CardTitle className="text-xl flex items-center gap-2">
+                            <History className="w-5 h-5 text-indigo-400" />
+                            Sent History
+                        </CardTitle>
+                        <CardDescription>Review recent platform announcements.</CardDescription>
                     </div>
-                )}
-            </div>
+                    <Badge variant="hero" className="rounded-lg">{history?.length || 0} Sent</Badge>
+                </CardHeader>
+                <CardContent className="h-[550px] overflow-y-auto pr-2 custom-scrollbar">
+                    {(history || []).length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-4">
+                            <Bell className="w-12 h-12 opacity-20" />
+                            <p className="text-sm">No notification history yet.</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {(history || []).map((n) => (
+                                <div key={n._id} className="group relative border border-border/30 rounded-xl p-4 bg-background/30 hover:bg-background/60 transition-all hover:border-border/60">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <h4 className="font-semibold text-foreground text-sm leading-tight pr-4">{n.title}</h4>
+                                        <span className="text-[10px] text-muted-foreground whitespace-nowrap bg-muted/50 px-2 py-0.5 rounded uppercase font-bold">
+                                            {new Date(n.createdAt).toLocaleDateString()}
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground line-clamp-3 mb-3 leading-relaxed">
+                                        {n.message}
+                                    </p>
+                                    <div className="flex items-center gap-4 border-t border-border/20 pt-3">
+                                        <div className="flex items-center gap-1.5">
+                                            <Send className="w-3 h-3 text-indigo-400" />
+                                            <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider">{n.channel}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                            <UsersIcon className="w-3 h-3 text-emerald-400" />
+                                            <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider truncate max-w-[120px]">
+                                                {n.audienceType.replace("_", " ")}
+                                                {n.recipientCount !== undefined && ` (${n.recipientCount})`}
+                                            </span>
+                                        </div>
+                                        {n.sentBy && (
+                                            <div className="ml-auto text-[10px] text-muted-foreground italic flex items-center gap-1">
+                                                <UserCheck className="w-3 h-3" />
+                                                {n.sentBy.name || "System"}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
         </div>
-    );
-}
-
-// ─── Shared UI primitives ─────────────────────────────────────────────────────
-function TableWrapper({ children }) {
-    return (
-        <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-                {children}
-            </table>
-        </div>
-    );
-}
-function Th({ children }) {
-    return <th style={{ textAlign: "left", padding: "10px 12px", color: "#64748b", fontWeight: 600, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.05em" }}>{children}</th>;
-}
-function Td({ children, style }) {
-    return <td style={{ padding: "12px", verticalAlign: "middle", color: "#e2e8f0", ...style }}>{children}</td>;
-}
-function Badge({ color, children }) {
-    return <span style={{ display: "inline-block", padding: "2px 10px", borderRadius: 999, background: `${color}22`, color, fontSize: 12, fontWeight: 600, border: `1px solid ${color}44` }}>{children}</span>;
-}
-function ActionBtn({ color, onClick, children }) {
-    return (
-        <button
-            onClick={onClick}
-            style={{ background: `${color}22`, color, border: `1px solid ${color}44`, borderRadius: 6, padding: "4px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.15s" }}
-            onMouseOver={(e) => { e.currentTarget.style.background = `${color}44`; }}
-            onMouseOut={(e) => { e.currentTarget.style.background = `${color}22`; }}
-        >
-            {children}
-        </button>
     );
 }

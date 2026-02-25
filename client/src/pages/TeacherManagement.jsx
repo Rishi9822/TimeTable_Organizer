@@ -66,6 +66,7 @@ import {
 } from '@/hooks/useTeachers';
 import { useInstitutionContext } from '@/contexts/InstitutionContext';
 import { Skeleton } from '@/components/ui/skeleton';
+import { DashboardLayout } from "@/components/DashboardLayout";
 
 const COLORS = [
   '#4F46E5', '#7C3AED', '#EC4899', '#EF4444', '#F97316',
@@ -252,34 +253,11 @@ const TeacherManagement = () => {
 
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border/50">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-4">
-              <Link to="/builder">
-                <Button variant="ghost" size="sm" className="gap-2">
-                  <ArrowLeft className="w-4 h-4" />
-                  <span className="hidden sm:inline">Builder</span>
-                </Button>
-              </Link>
-              <div className="h-6 w-px bg-border" />
-              <div>
-                <h1 className="text-lg font-semibold text-foreground">Teacher Management</h1>
-                <p className="text-xs text-muted-foreground hidden sm:block">Manage teachers, subjects, and classes</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <NotificationBell />
-              <UserMenu />
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <>
+      <DashboardLayout
+        title="Teacher Management"
+        subtitle="Manage teachers, subjects, and classes"
+      >
         <Tabs defaultValue="teachers" className="space-y-6">
           <TabsList className="grid w-full max-w-md grid-cols-3">
             <TabsTrigger value="teachers" className="gap-2">
@@ -850,7 +828,7 @@ const TeacherManagement = () => {
             )}
           </TabsContent>
         </Tabs>
-      </main>
+      </DashboardLayout>
 
       {/* Delete Teacher Confirmation Dialog */}
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
@@ -912,7 +890,7 @@ const TeacherManagement = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </>
   );
 };
 

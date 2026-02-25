@@ -39,6 +39,11 @@ export const AuthProvider = ({ children }) => {
 
       try {
         const { data } = await API.get("/auth/me");
+        if (data.user?.isBlocked) {
+          localStorage.removeItem("token");
+          signOut();
+          return;
+        }
         setUser(data.user);
         setRole(data.user.role);
         setInstitutionId(data.user.institutionId || null);

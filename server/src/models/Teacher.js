@@ -6,7 +6,6 @@ const teacherSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Institution",
       required: true,
-      index: true,
     },
     name: {
       type: String,
@@ -38,6 +37,9 @@ const teacherSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// Compound index for mode-aware filtering
+teacherSchema.index({ institutionId: 1, modeType: 1 });
 
 /**
  * Convert _id → id (Supabase compatible)

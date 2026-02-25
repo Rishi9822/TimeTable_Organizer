@@ -66,21 +66,20 @@ export const InstitutionProvider = ({ children }) => {
 
   useEffect(() => {
     if (dbSettings) {
-      setConfig({
-        institutionName: dbSettings.institution_name || "",
-        institutionType: dbSettings.institution_type,
-        workingDays:
-          dbSettings.working_days || defaultConfig.workingDays,
-        periodsPerDay:
-          dbSettings.periods_per_day || defaultConfig.periodsPerDay,
-        periodDuration:
-          dbSettings.period_duration || defaultConfig.periodDuration,
-        breaks: dbSettings.breaks || defaultConfig.breaks,
-        startTime: dbSettings.start_time || defaultConfig.startTime,
-        labDuration: dbSettings.lab_duration || defaultConfig.labDuration,
-        periods: [],
-        isSetupComplete: dbSettings.is_setup_complete || false,
-      });
+      setConfig((prev) => ({
+        ...prev,
+        institutionName: dbSettings.institution_name || prev.institutionName || "",
+        // Only overwrite institutionType if it's not already set locally to something else
+        // (This prevents overwritting mode=college with db's school during setup)
+        institutionType: prev.institutionType || dbSettings.institution_type,
+        workingDays: dbSettings.working_days || prev.workingDays || defaultConfig.workingDays,
+        periodsPerDay: dbSettings.periods_per_day || prev.periodsPerDay || defaultConfig.periodsPerDay,
+        periodDuration: dbSettings.period_duration || prev.periodDuration || defaultConfig.periodDuration,
+        breaks: dbSettings.breaks || prev.breaks || defaultConfig.breaks,
+        startTime: dbSettings.start_time || prev.startTime || defaultConfig.startTime,
+        labDuration: dbSettings.lab_duration || prev.labDuration || defaultConfig.labDuration,
+        isSetupComplete: dbSettings.is_setup_complete || prev.isSetupComplete || false,
+      }));
     }
   }, [dbSettings]);
 
