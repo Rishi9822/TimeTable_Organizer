@@ -18,8 +18,16 @@ const authMiddleware = async (req, res, next) => {
       return res.status(401).json({ message: "User not found" });
     }
 
+    // Platform-level block — super admin can block any user
+    if (user.isBlocked) {
+      return res.status(403).json({
+        message: "Your account has been blocked. Please contact support.",
+        code: "ACCOUNT_BLOCKED",
+      });
+    }
+
     req.user = user;
-    next();
+    next()
   } catch (error) {
     return res.status(401).json({ message: "Invalid token" });
   }

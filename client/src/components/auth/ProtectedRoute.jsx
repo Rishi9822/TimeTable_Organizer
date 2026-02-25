@@ -40,6 +40,9 @@ export const ProtectedRoute = ({ children, requiredRoles }) => {
   // BUT: Allow unverified users to stay on /auth to see verification message
   // This is for backward compatibility - existing users can still use the app
   if (user && currentPath === "/auth" && emailVerified) {
+    if (role === "super_admin") {
+      return <Navigate to="/super-admin" replace />;
+    }
     if (role === "admin") {
       if (!institutionId || !isSetupComplete) {
         return <Navigate to="/setup" replace />;

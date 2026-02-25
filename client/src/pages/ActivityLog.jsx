@@ -11,6 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { UserMenu } from "@/components/auth/UserMenu";
+import NotificationBell from "@/components/notifications/NotificationBell";
 import { ArrowLeft, FileText, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -136,7 +137,10 @@ const ActivityLog = () => {
                 </div>
               </div>
             </div>
-            <UserMenu />
+            <div className="flex items-center gap-2">
+              <NotificationBell />
+              <UserMenu />
+            </div>
           </div>
         </div>
       </header>

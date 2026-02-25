@@ -12,6 +12,9 @@ import inviteCodeRoutes from "./routes/inviteCode.routes.js";
 import timetableRoutes from "./routes/timetable.routes.js";
 import auditLogRoutes from "./routes/auditLog.routes.js";
 import stripeRoutes from "./routes/stripe.routes.js";
+import superAdminRoutes from "./routes/superAdmin.routes.js";
+import notificationRoutes from "./routes/notification.routes.js";
+import checkSubscription from "./middleware/checkSubscription.js";
 
 
 
@@ -104,17 +107,28 @@ if (stripeInstance) {
 // JSON body parser for all other routes
 app.use(express.json());
 
-app.use("/api/teachers", teacherRoutes);
-app.use("/api/subjects", subjectRoutes);
-app.use("/api/classes", classRoutes);
-app.use("/api", assignmentRoutes);
-app.use("/api/institutions", institutionRoutes, inviteCodeRoutes);
-app.use("/api/auth", authRoutes);
-app.use("/api/institution-settings", institutionSettingsRoutes);
-app.use("/api/timetables", timetableRoutes);
-app.use("/api/audit-logs", auditLogRoutes);
+// ── Super Admin (no checkSubscription — SA operates platform-wide) ────────────
+app.use("/api/super-admin", superAdminRoutes);
 
-// Stripe routes (webhook already registered above)
+// ── User notification inbox ────────────────────────────────────────────────────
+app.use("/api/notifications", notificationRoutes);
+
+// ── Auth ───────────────────────────────────────────────────────────────────────
+app.use("/api/auth", authRoutes);
+
+// ── Institution management (no subscription guard — needed for setup/upgrade) ──
+app.use("/api/institutions", institutionRoutes, inviteCodeRoutes);
+app.use("/api/institution-settings", institutionSettingsRoutes);
+
+// ── Institution-scoped data routes — hard-blocked on expired trial (402) ───────
+app.use("/api/teachers", checkSubscription, teacherRoutes);
+app.use("/api/subjects", checkSubscription, subjectRoutes);
+app.use("/api/classes", checkSubscription, classRoutes);
+app.use("/api", checkSubscription, assignmentRoutes);
+app.use("/api/timetables", checkSubscription, timetableRoutes);
+app.use("/api/audit-logs", checkSubscription, auditLogRoutes);
+
+// ── Stripe routes (webhook already registered above) ──────────────────────────
 app.use("/api/stripe", stripeRoutes);
 
 

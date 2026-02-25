@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  ArrowLeft, 
-  Save, 
-  Download, 
-  Undo2, 
-  Redo2, 
+import {
+  ArrowLeft,
+  Save,
+  Download,
+  Undo2,
+  Redo2,
   Settings,
   CheckCircle,
   AlertCircle,
@@ -26,6 +26,7 @@ import {
 import TimetableGrid from '@/components/timetable/TimetableGrid';
 import ClassSelector from '@/components/timetable/ClassSelector';
 import { UserMenu } from '@/components/auth/UserMenu';
+import NotificationBell from '@/components/notifications/NotificationBell';
 import { useClasses } from '@/hooks/useTeachers';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTimetableContext } from '@/contexts/TimetableContext';
@@ -36,7 +37,7 @@ const RealTimetableBuilder = () => {
   const { hasRole } = useAuth();
   const { data: classes = [] } = useClasses();
   const { loadTimetable, loadAllTimetables, saveTimetable, isLoading, isSaving } = useTimetableContext();
-  
+
   const [selectedClassId, setSelectedClassId] = useState('');
   const [selectedClassName, setSelectedClassName] = useState('');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -145,7 +146,7 @@ const RealTimetableBuilder = () => {
 
             {/* Center - Class Selector */}
             <div className="hidden md:block">
-              <ClassSelector 
+              <ClassSelector
                 selectedClassId={selectedClassId}
                 onSelectClass={handleSelectClass}
               />
@@ -176,9 +177,9 @@ const RealTimetableBuilder = () => {
                 <Download className="w-4 h-4" />
                 Export
               </Button>
-              <Button 
-                variant="hero" 
-                size="sm" 
+              <Button
+                variant="hero"
+                size="sm"
                 onClick={() => handleSave()}
                 disabled={isSaving(selectedClassId) || !hasUnsavedChanges}
                 className="gap-2"
@@ -195,13 +196,16 @@ const RealTimetableBuilder = () => {
                   </>
                 )}
               </Button>
-              <UserMenu />
+              <div className="flex items-center gap-2">
+                <NotificationBell />
+                <UserMenu />
+              </div>
             </div>
           </div>
 
           {/* Mobile class selector */}
           <div className="md:hidden pb-3">
-            <ClassSelector 
+            <ClassSelector
               selectedClassId={selectedClassId}
               onSelectClass={handleSelectClass}
             />
@@ -217,7 +221,7 @@ const RealTimetableBuilder = () => {
             <p className="text-muted-foreground">Loading timetable...</p>
           </div>
         ) : selectedClassId ? (
-          <TimetableGrid 
+          <TimetableGrid
             ref={timetableRef}
             classId={selectedClassId}
             className={selectedClassName}
@@ -268,7 +272,7 @@ const RealTimetableBuilder = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
             <AlertDialogDescription>
-              You have unsaved changes to the timetable for {selectedClassName}. 
+              You have unsaved changes to the timetable for {selectedClassName}.
               Do you want to save before switching classes?
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -277,7 +281,7 @@ const RealTimetableBuilder = () => {
             <AlertDialogAction onClick={handleConfirmSwitch}>
               Switch Without Saving
             </AlertDialogAction>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={async () => {
                 await handleSave();
                 handleConfirmSwitch();
@@ -434,7 +438,7 @@ const DemoTimetableBuilder = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
             <AlertDialogDescription>
-              You have unsaved changes to the timetable for {selectedClassName}. 
+              You have unsaved changes to the timetable for {selectedClassName}.
               Do you want to discard them and switch classes?
             </AlertDialogDescription>
           </AlertDialogHeader>

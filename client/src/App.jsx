@@ -8,6 +8,8 @@ import { TimetableProvider } from "@/contexts/TimetableContext";
 import { InstitutionProvider } from "@/contexts/InstitutionContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { DemoProvider } from "@/contexts/DemoContext";
+import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
+import { NotificationProvider } from "@/contexts/NotificationContext";
 
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 
@@ -26,6 +28,7 @@ import EmailVerificationSuccess from "@/pages/EmailVerificationSuccess";
 import EmailVerificationProcessing from "@/pages/EmailVerificationProcessing";
 import NotFound from "@/pages/NotFound";
 import ActivityLog from "@/pages/ActivityLog";
+import SuperAdminDashboard from "@/pages/SuperAdminDashboard";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -42,101 +45,115 @@ const App = () => {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AuthProvider>
-          <InstitutionProvider>
-            <TimetableProvider>
-              <Toaster />
-              <Sonner />
-              <BrowserRouter>
-                <Routes>
-                  {/* Public */}
-                  <Route path="/" element={<Index />} />
-                  <Route
-                    path="/demo"
-                    element={
-                      <DemoProvider>
-                        <DemoMode />
-                      </DemoProvider>
-                    }
-                  />
-                  <Route path="/auth" element={<Auth />} />
-                  <Route path="/auth/forgot-password" element={<ForgotPassword />} />
-                  <Route path="/auth/reset-password" element={<ResetPassword />} />
-                  <Route path="/auth/verify-email" element={<EmailVerificationProcessing />} />
-                  <Route path="/auth/verify-email-success" element={<EmailVerificationSuccess />} />
+          <SubscriptionProvider>
+            <NotificationProvider>
+              <InstitutionProvider>
+                <TimetableProvider>
+                  <Toaster />
+                  <Sonner />
+                  <BrowserRouter>
+                    <Routes>
+                      {/* Public */}
+                      <Route path="/" element={<Index />} />
+                      <Route
+                        path="/demo"
+                        element={
+                          <DemoProvider>
+                            <DemoMode />
+                          </DemoProvider>
+                        }
+                      />
+                      <Route path="/auth" element={<Auth />} />
+                      <Route path="/auth/forgot-password" element={<ForgotPassword />} />
+                      <Route path="/auth/reset-password" element={<ResetPassword />} />
+                      <Route path="/auth/verify-email" element={<EmailVerificationProcessing />} />
+                      <Route path="/auth/verify-email-success" element={<EmailVerificationSuccess />} />
 
-                  {/* Admin */}
-                  <Route
-                    path="/admin"
-                    element={
-                      <ProtectedRoute requiredRoles={["admin"]}>
-                        <AdminDashboard />
-                      </ProtectedRoute>
-                    }
-                  />
+                      {/* Admin */}
+                      <Route
+                        path="/admin"
+                        element={
+                          <ProtectedRoute requiredRoles={["admin"]}>
+                            <AdminDashboard />
+                          </ProtectedRoute>
+                        }
+                      />
 
-                  <Route
-                    path="/setup"
-                    element={
-                      <ProtectedRoute requiredRoles={["admin"]}>
-                        <SetupWizard />
-                      </ProtectedRoute>
-                    }
-                  />
+                      <Route
+                        path="/setup"
+                        element={
+                          <ProtectedRoute requiredRoles={["admin"]}>
+                            <SetupWizard />
+                          </ProtectedRoute>
+                        }
+                      />
 
-                  {/* Scheduler join */}
-                  <Route
-                    path="/join"
-                    element={
-                      <ProtectedRoute requiredRoles={["scheduler"]}>
-                        <JoinInstitution />
-                      </ProtectedRoute>
-                    }
-                  />
+                      {/* Scheduler join */}
+                      <Route
+                        path="/join"
+                        element={
+                          <ProtectedRoute requiredRoles={["scheduler"]}>
+                            <JoinInstitution />
+                          </ProtectedRoute>
+                        }
+                      />
 
-                  {/* Admin + Scheduler */}
-                  <Route
-                    path="/builder"
-                    element={
-                      <ProtectedRoute requiredRoles={["admin", "scheduler"]}>
-                        <TimetableBuilder />
-                      </ProtectedRoute>
-                    }
-                  />
+                      {/* Admin + Scheduler */}
+                      <Route
+                        path="/builder"
+                        element={
+                          <ProtectedRoute requiredRoles={["admin", "scheduler"]}>
+                            <TimetableBuilder />
+                          </ProtectedRoute>
+                        }
+                      />
 
-                  <Route
-                    path="/teachers"
-                    element={
-                      <ProtectedRoute requiredRoles={["admin", "scheduler"]}>
-                        <TeacherManagement />
-                      </ProtectedRoute>
-                    }
-                  />
+                      <Route
+                        path="/teachers"
+                        element={
+                          <ProtectedRoute requiredRoles={["admin", "scheduler"]}>
+                            <TeacherManagement />
+                          </ProtectedRoute>
+                        }
+                      />
 
-                  <Route
-                    path="/activity-log"
-                    element={
-                      <ProtectedRoute requiredRoles={["admin", "scheduler"]}>
-                        <ActivityLog />
-                      </ProtectedRoute>
-                    }
-                  />
+                      <Route
+                        path="/activity-log"
+                        element={
+                          <ProtectedRoute requiredRoles={["admin", "scheduler"]}>
+                            <ActivityLog />
+                          </ProtectedRoute>
+                        }
+                      />
 
-                  {/* Teacher / Student */}
-                  <Route
-                    path="/dashboard"
-                    element={
-                      <ProtectedRoute>
-                        <UserDashboard />
-                      </ProtectedRoute>
-                    }
-                  />
+                      {/* Teacher / Student */}
+                      <Route
+                        path="/dashboard"
+                        element={
+                          <ProtectedRoute>
+                            <UserDashboard />
+                          </ProtectedRoute>
+                        }
+                      />
 
-                  {/* 404 */}
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </BrowserRouter>
-            </TimetableProvider>
-          </InstitutionProvider>
+                      {/* Super Admin */}
+                      <Route
+                        path="/super-admin"
+                        element={
+                          <ProtectedRoute requiredRoles={["super_admin"]}>
+                            <SuperAdminDashboard />
+                          </ProtectedRoute>
+                        }
+                      />
+
+                      {/* 404 */}
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                  </BrowserRouter>
+                </TimetableProvider>
+              </InstitutionProvider>
+            </NotificationProvider>
+          </SubscriptionProvider>
         </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>

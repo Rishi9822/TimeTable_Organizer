@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import API from "@/lib/api";
 
 export const AppRole = {
+  SUPER_ADMIN: "super_admin",
   ADMIN: "admin",
   SCHEDULER: "scheduler",
   TEACHER: "teacher",
@@ -89,6 +90,12 @@ export const AuthProvider = ({ children }) => {
     try {
       const res = await API.post("/auth/login", { email, password });
 
+      // If the backend returns a blocked user (shouldn't happen since authMiddleware blocks it,
+      // but guard here too)
+      if (res.data.user?.isBlocked) {
+        return { error: { message: "Your account has been blocked. Please contact support." } };
+      }
+
       localStorage.setItem("token", res.data.token);
 
       setUser(res.data.user);
@@ -118,21 +125,24 @@ export const AuthProvider = ({ children }) => {
 
 
   const refreshUserData = async () => {
-  try {
-    const { data } = await API.get("/auth/me");
-    setUser(data.user);
-    setRole(data.user.role);
-    setInstitutionId(data.user.institutionId || null);
-    setIsSetupComplete(!!data.user.isSetupComplete);
-    setEmailVerified(!!data.user.emailVerified);
-  } catch {
-    signOut();
-  }
-};
+    try {
+      const { data } = await API.get("/auth/me");
+      setUser(data.user);
+      setRole(data.user.role);
+      setInstitutionId(data.user.institutionId || null);
+      setIsSetupComplete(!!data.user.isSetupComplete);
+      setEmailVerified(!!data.user.emailVerified);
+    } catch {
+      signOut();
+    }
+  };
 
 
   const hasRole = (requiredRole) => {
     if (!role) return false;
+
+    // Super admin has platform-level god mode — passes every role check
+    if (role === "super_admin") return true;
 
     const roles = Array.isArray(requiredRole)
       ? requiredRole
@@ -144,20 +154,20 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider
-  value={{
-    user,
-    role,
-    institutionId,
-    isSetupComplete,
-    emailVerified,
-    loading,
-    signUp,
-    signIn,
-    signOut,
-    hasRole,
-    refreshUserData,
-  }}
->
+      value={{
+        user,
+        role,
+        institutionId,
+        isSetupComplete,
+        emailVerified,
+        loading,
+        signUp,
+        signIn,
+        signOut,
+        hasRole,
+        refreshUserData,
+      }}
+    >
 
       {children}
     </AuthContext.Provider>

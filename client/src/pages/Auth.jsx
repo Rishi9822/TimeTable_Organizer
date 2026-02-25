@@ -78,6 +78,9 @@ const Auth = () => {
   const getRedirectPath = () => {
     if (!role) return "/auth";
 
+    // Super admin always goes to the SA console
+    if (role === "super_admin") return "/super-admin";
+
     if (role === "admin") {
       if (!institutionId || !isSetupComplete) return "/setup";
       return "/admin";
@@ -224,7 +227,7 @@ const Auth = () => {
   ====================== */
   const handleResendVerification = async () => {
     const emailToResend = user?.email || loginEmail || signupEmail;
-    
+
     if (!emailToResend) {
       toast({
         title: "Error",
@@ -374,7 +377,7 @@ const Auth = () => {
                 >
                   {isSubmitting ? "Signing in..." : "Sign In"}
                 </Button>
-                
+
                 <div className="text-center">
                   <button
                     type="button"
