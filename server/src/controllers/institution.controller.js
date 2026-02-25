@@ -55,7 +55,7 @@ export const upsertInstitutionSettings = async (req, res) => {
     if (req.body.institution_type && currentSettings?.institution_type) {
       const newType = req.body.institution_type;
       const validation = canSwitchInstitutionType(institution, newType, currentSettings);
-      
+
       if (!validation.allowed) {
         return res.status(403).json({
           message: validation.reason || "Institution type switching is not allowed",
@@ -73,11 +73,11 @@ export const upsertInstitutionSettings = async (req, res) => {
     if (institution.plan === "flex") {
       // Determine which mode we're updating (use activeMode if type not specified)
       const mode = req.body.institution_type || institution.activeMode || currentSettings?.institution_type;
-      
+
       if (mode) {
         // Preserve existing flex mode settings
         const existingSettings = currentSettings?.flexModeSettings || {};
-        
+
         // Store/update settings for this specific mode
         updateData.flexModeSettings = {
           ...existingSettings,
@@ -108,7 +108,7 @@ export const upsertInstitutionSettings = async (req, res) => {
       "institution",
       req.user.institutionId,
       {}
-    ).catch(() => {}); // Silently ignore logging errors
+    ).catch(() => { }); // Silently ignore logging errors
 
     res.json(settings);
   } catch (error) {
@@ -124,9 +124,9 @@ export const setupInstitution = async (req, res) => {
 
   // CRITICAL: Enforce email verification requirement
   if (!req.user.emailVerified) {
-    return res.status(403).json({ 
+    return res.status(403).json({
       message: "Please verify your email address before completing institution setup. Check your inbox for the verification link.",
-      requiresEmailVerification: true 
+      requiresEmailVerification: true
     });
   }
 
@@ -135,7 +135,7 @@ export const setupInstitution = async (req, res) => {
   if (req.user.institutionId) {
     // ✅ UPDATE ONLY
     institution = await Institution.findById(req.user.institutionId);
-    
+
     if (!institution) {
       return res.status(404).json({ message: "Institution not found" });
     }
@@ -165,14 +165,14 @@ export const setupInstitution = async (req, res) => {
     if (institution.plan === "flex" && modeForSetup) {
       const mode = modeForSetup;
       const completedModes = institution.completedModes || [];
-      
+
       // SaaS Logic: Prevent duplicate setup for already completed mode
       if (completedModes.includes(mode)) {
         return res.status(403).json({
           message: `Mode "${mode}" is already set up. You can switch between modes after both are completed, or update settings without re-running setup.`,
         });
       }
-      
+
       // Validate if this mode setup is allowed
       const validation = canCompleteModeSetup(institution, mode);
       if (!validation.allowed) {
@@ -239,7 +239,7 @@ export const setupInstitution = async (req, res) => {
       "institution",
       institution._id,
       { institutionName: institution.name }
-    ).catch(() => {}); // Silently ignore logging errors
+    ).catch(() => { }); // Silently ignore logging errors
   } else {
     // ✅ CREATE ONCE
     institution = await Institution.create({
@@ -252,6 +252,21 @@ export const setupInstitution = async (req, res) => {
       institutionId: institution._id,
     });
 
+    // Auto-create Subscription with 14-day trial
+    try {
+      const { default: Subscription } = await import("../models/Subscription.js");
+      await Subscription.create({
+        institutionId: institution._id,
+        plan: "trial",
+        status: "active",
+        trialStartedAt: new Date(),
+        // trialEndsAt is auto-calculated in pre-save hook
+      });
+    } catch (subErr) {
+      // Non-fatal: log but don't block institution creation
+      console.error("[Institution] Failed to create Subscription record:", subErr.message);
+    }
+
     // Audit log: Log AFTER successful institution creation
     logAuditFromRequest(
       req,
@@ -259,7 +274,7 @@ export const setupInstitution = async (req, res) => {
       "institution",
       institution._id,
       { institutionName: institution.name }
-    ).catch(() => {}); // Silently ignore logging errors
+    ).catch(() => { }); // Silently ignore logging errors
   }
 
   res.json({
@@ -281,7 +296,7 @@ export const getInstitutionInfo = async (req, res) => {
     }
 
     const institution = await Institution.findById(req.user.institutionId);
-    
+
     if (!institution) {
       return res.status(404).json({ message: "Institution not found" });
     }
@@ -356,7 +371,7 @@ export const switchMode = async (req, res) => {
     }
 
     const institution = await Institution.findById(req.user.institutionId);
-    
+
     if (!institution) {
       return res.status(404).json({ message: "Institution not found" });
     }
@@ -421,7 +436,7 @@ export const switchMode = async (req, res) => {
       "institution",
       institution._id,
       { mode, previousMode: institution.activeMode }
-    ).catch(() => {});
+    ).catch(() => { });
 
     res.json({
       message: `Switched to ${mode} mode successfully`,

@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/card";
 import { UserMenu } from "@/components/auth/UserMenu";
 import { useAuth } from "@/contexts/AuthContext";
+import NotificationBell from "@/components/notifications/NotificationBell";
 import InviteCodesCard from "@/components/admin/InviteCodesCard";
 import { InstitutionStatusBanner } from "@/components/admin/InstitutionStatusBanner";
 import { InstitutionPlanCard } from "@/components/admin/InstitutionPlanCard";
@@ -54,19 +55,19 @@ const AdminDashboard = () => {
       const verifySession = async () => {
         try {
           const { data } = await API.get(`/stripe/verify-session?session_id=${sessionId}`);
-          
+
           if (data.success) {
             // Invalidate all institution-related queries to force refresh
             await queryClient.invalidateQueries({ queryKey: ["institutionInfo"] });
-            
+
             // Refetch immediately to get updated state
             await queryClient.refetchQueries({ queryKey: ["institutionInfo"] });
-            
+
             toast({
               title: "Payment successful!",
               description: `Your plan has been upgraded to ${data.institution.plan}. The page will refresh to show your updated subscription.`,
             });
-            
+
             // Small delay to show toast, then refresh to ensure auth context is updated
             setTimeout(() => {
               window.location.reload();
@@ -77,12 +78,12 @@ const AdminDashboard = () => {
           // Still invalidate queries in case webhook already processed it
           await queryClient.invalidateQueries({ queryKey: ["institutionInfo"] });
           await queryClient.refetchQueries({ queryKey: ["institutionInfo"] });
-          
+
           toast({
             title: "Verifying payment...",
             description: "Please wait while we verify your payment. If you just completed payment, your plan should update shortly.",
           });
-          
+
           // Refresh after a delay to ensure state is synced
           setTimeout(() => {
             window.location.reload();
@@ -116,7 +117,10 @@ const AdminDashboard = () => {
                 </p>
               </div>
             </div>
-            <UserMenu />
+            <div className="flex items-center gap-2">
+              <NotificationBell />
+              <UserMenu />
+            </div>
           </div>
         </div>
       </header>

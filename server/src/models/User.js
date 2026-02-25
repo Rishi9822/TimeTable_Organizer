@@ -18,14 +18,28 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ["admin", "scheduler", "teacher", "student"],
+      enum: ["super_admin", "admin", "scheduler", "teacher", "student"],
       default: "student",
     },
 
+    // Platform-level flag — super_admin must always have null institutionId
     institutionId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Institution",
       default: null,
+      validate: {
+        validator: function (value) {
+          if (this.role === "super_admin") return value === null || value === undefined;
+          return true; // other roles: institutionId can be null until they join
+        },
+        message: "super_admin users must not belong to an institution (institutionId must be null)",
+      },
+    },
+
+    // Allows super admin to block users platform-wide
+    isBlocked: {
+      type: Boolean,
+      default: false,
     },
 
     // Email verification fields

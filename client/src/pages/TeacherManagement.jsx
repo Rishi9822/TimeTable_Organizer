@@ -46,6 +46,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/useToast';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserMenu } from '@/components/auth/UserMenu';
+import NotificationBell from '@/components/notifications/NotificationBell';
 import {
   useTeachers,
   useCreateTeacher,
@@ -269,7 +270,10 @@ const TeacherManagement = () => {
                 <p className="text-xs text-muted-foreground hidden sm:block">Manage teachers, subjects, and classes</p>
               </div>
             </div>
-            <UserMenu />
+            <div className="flex items-center gap-2">
+              <NotificationBell />
+              <UserMenu />
+            </div>
           </div>
         </div>
       </header>

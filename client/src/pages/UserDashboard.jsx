@@ -1,6 +1,7 @@
 import React from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { UserMenu } from "@/components/auth/UserMenu";
+import NotificationBell from "@/components/notifications/NotificationBell";
 import {
   Card,
   CardContent,
@@ -54,7 +55,10 @@ const UserDashboard = () => {
                 </p>
               </div>
             </div>
-            <UserMenu />
+            <div className="flex items-center gap-2">
+              <NotificationBell />
+              <UserMenu />
+            </div>
           </div>
         </div>
       </header>
