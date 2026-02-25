@@ -29,11 +29,11 @@ const checkSubscription = async (req, res, next) => {
             return next();
         }
 
-        // Hard block: trial has expired
-        if (subscription.plan === "trial" && subscription.trialEndsAt < new Date()) {
+        // Hard block: subscription has expired (applies to all plans if date is set)
+        if (subscription.trialEndsAt && subscription.trialEndsAt < new Date()) {
             return res.status(402).json({
-                message: "Trial expired. Please upgrade your plan to continue.",
-                code: "TRIAL_EXPIRED",
+                message: "Subscription/Trial expired. Please renew or upgrade your plan to continue.",
+                code: "SUBSCRIPTION_EXPIRED",
             });
         }
 

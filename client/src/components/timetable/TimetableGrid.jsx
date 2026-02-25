@@ -29,6 +29,8 @@ const generateTeacherColor = (name) => {
 
 const RealTimetableGrid = forwardRef(({ classId, className: classSectionName, onChange, hasUnsavedChanges }, ref) => {
     const [assignments, setAssignments] = useState(new Map());
+    const [history, setHistory] = useState([new Map()]);
+    const [historyIndex, setHistoryIndex] = useState(0);
     const [activeId, setActiveId] = useState(null);
     const [activeDragData, setActiveDragData] = useState(null);
 
@@ -71,7 +73,7 @@ const RealTimetableGrid = forwardRef(({ classId, className: classSectionName, on
         }
 
         const timetable = getTimetable(classId);
-        
+
         if (timetable && timetable.periods) {
             // Convert periods object to Map structure for UI
             // CRITICAL: Backend uses full day names ("Monday"), UI uses short names ("Mon")
@@ -90,7 +92,7 @@ const RealTimetableGrid = forwardRef(({ classId, className: classSectionName, on
                     const { period, subjectId, teacherId } = periodData;
                     // CRITICAL: Use short day name for slotId (UI format)
                     const slotId = `${dayShort}-${period}`;
-                    
+
                     const teacher = getTeacherById(teacherId);
                     const subject = getSubjectById(subjectId);
 
@@ -115,7 +117,7 @@ const RealTimetableGrid = forwardRef(({ classId, className: classSectionName, on
         }
     }, [classId, getTimetable, allTeachers.length, allSubjects.length]); // Only depend on lengths, not arrays
 
-    // Expose getPeriods method to parent
+    // Expose methods to parent
     useImperativeHandle(ref, () => ({
         getPeriods: () => {
             // Convert Map to periods object structure
@@ -142,6 +144,29 @@ const RealTimetableGrid = forwardRef(({ classId, className: classSectionName, on
             });
 
             return periods;
+        },
+        undo: () => {
+            if (historyIndex > 0) {
+                const newIndex = historyIndex - 1;
+                setHistoryIndex(newIndex);
+                setAssignments(new Map(history[newIndex]));
+                if (onChange) onChange();
+            }
+        },
+        redo: () => {
+            if (historyIndex < history.length - 1) {
+                const newIndex = historyIndex + 1;
+                setHistoryIndex(newIndex);
+                setAssignments(new Map(history[newIndex]));
+                if (onChange) onChange();
+            }
+        },
+        canUndo: historyIndex > 0,
+        canRedo: historyIndex < history.length - 1,
+        exportTimetable: () => {
+            // Placeholder: In a real app, this would trigger generating a PDF/Excel
+            // For now, we'll return the raw data and let the parent handle the toast
+            return assignments;
         },
     }));
 
@@ -216,7 +241,7 @@ const RealTimetableGrid = forwardRef(({ classId, className: classSectionName, on
     // Get unavailable teachers for each slot
     const getUnavailableTeachersForSlot = (dayShort, period) => {
         const unavailable = [];
-        
+
         // CRITICAL: Convert short day name to full name for conflict detection
         const dayIndex = DAYS_SHORT.indexOf(dayShort);
         if (dayIndex === -1) return unavailable;
@@ -265,7 +290,7 @@ const RealTimetableGrid = forwardRef(({ classId, className: classSectionName, on
         if (!isTeacherAvailable(dragData.teacherId, dayFull, period, classId)) {
             const conflict = getTeacherConflict(dragData.teacherId, dayFull, period, classId);
             toast.error('Teacher conflict detected!', {
-                description: conflict 
+                description: conflict
                     ? `${dragData.teacherName} is already teaching in another class at this time.`
                     : `${dragData.teacherName} is not available at this time.`,
                 icon: <AlertCircle className="w-4 h-4" />,
@@ -283,10 +308,17 @@ const RealTimetableGrid = forwardRef(({ classId, className: classSectionName, on
             color: dragData.color,
         };
 
-        // Update local state
+        // Update local state and history
         setAssignments(prev => {
             const updated = new Map(prev);
             updated.set(slotId, newAssignment);
+
+            // History management
+            const nextHistory = history.slice(0, historyIndex + 1);
+            nextHistory.push(new Map(updated));
+            setHistory(nextHistory);
+            setHistoryIndex(nextHistory.length - 1);
+
             return updated;
         });
 
@@ -362,7 +394,7 @@ const RealTimetableGrid = forwardRef(({ classId, className: classSectionName, on
                 periodsRequired: subject.periods_per_week || 4,
             };
         })
-        .filter(Boolean); // Remove null entries from invalid assignments
+            .filter(Boolean); // Remove null entries from invalid assignments
     }, [classTeacherAssignments, allTeachers, allSubjects]);
 
 
@@ -590,10 +622,12 @@ const DemoTimetableGrid = forwardRef(({ classId, className: classSectionName, on
     const { demoTeachers, demoSubjects } = useDemo();
 
     const [assignments, setAssignments] = useState(new Map());
+    const [history, setHistory] = useState([new Map()]);
+    const [historyIndex, setHistoryIndex] = useState(0);
     const [activeId, setActiveId] = useState(null);
     const [activeDragData, setActiveDragData] = useState(null);
 
-    // Expose getPeriods method to parent (same shape as real grid)
+    // Expose methods to parent (same shape as real grid)
     useImperativeHandle(ref, () => ({
         getPeriods: () => {
             const periods = {};
@@ -619,6 +653,27 @@ const DemoTimetableGrid = forwardRef(({ classId, className: classSectionName, on
             });
 
             return periods;
+        },
+        undo: () => {
+            if (historyIndex > 0) {
+                const newIndex = historyIndex - 1;
+                setHistoryIndex(newIndex);
+                setAssignments(new Map(history[newIndex]));
+                if (onChange) onChange();
+            }
+        },
+        redo: () => {
+            if (historyIndex < history.length - 1) {
+                const newIndex = historyIndex + 1;
+                setHistoryIndex(newIndex);
+                setAssignments(new Map(history[newIndex]));
+                if (onChange) onChange();
+            }
+        },
+        canUndo: historyIndex > 0,
+        canRedo: historyIndex < history.length - 1,
+        exportTimetable: () => {
+            return assignments;
         },
     }));
 
@@ -708,6 +763,13 @@ const DemoTimetableGrid = forwardRef(({ classId, className: classSectionName, on
         setAssignments((prev) => {
             const updated = new Map(prev);
             updated.set(slotId, newAssignment);
+
+            // History management
+            const nextHistory = history.slice(0, historyIndex + 1);
+            nextHistory.push(new Map(updated));
+            setHistory(nextHistory);
+            setHistoryIndex(nextHistory.length - 1);
+
             return updated;
         });
 

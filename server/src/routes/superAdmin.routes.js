@@ -27,16 +27,16 @@ router.get("/stats", async (req, res) => {
             total_orgs,
             suspended_orgs,
             total_users,
-            trial_subs,
-            standard_subs,
-            flex_subs,
+            trial_orgs,
+            standard_orgs,
+            flex_orgs,
         ] = await Promise.all([
             Institution.countDocuments({ status: { $ne: "archived" } }),
             Institution.countDocuments({ status: "suspended" }),
             User.countDocuments({ role: { $ne: "super_admin" }, isBlocked: { $ne: true } }),
-            Subscription.countDocuments({ plan: "trial", status: "active" }),
-            Subscription.countDocuments({ plan: "standard", status: "active" }),
-            Subscription.countDocuments({ plan: "flex", status: "active" }),
+            Institution.countDocuments({ plan: "trial", status: { $ne: "archived" } }),
+            Institution.countDocuments({ plan: "standard", status: { $ne: "archived" } }),
+            Institution.countDocuments({ plan: "flex", status: { $ne: "archived" } }),
         ]);
 
         const active_orgs = total_orgs - suspended_orgs;
@@ -46,9 +46,9 @@ router.get("/stats", async (req, res) => {
             active_orgs,
             suspended_orgs,
             total_users,
-            trial_subs,
-            standard_subs,
-            flex_subs,
+            trial_subs: trial_orgs,
+            standard_subs: standard_orgs,
+            flex_subs: flex_orgs,
         });
     } catch (error) {
         console.error("[SuperAdmin] stats error:", error);
@@ -335,10 +335,10 @@ router.patch("/subscriptions/:institutionId/extend-trial", async (req, res) => {
         // Also sync back to Institution
         await Institution.findByIdAndUpdate(req.params.institutionId, {
             trialEndsAt: subscription.trialEndsAt,
-            status: subscription.status === "active" && (await Institution.findById(req.params.institutionId)).status === "suspended" ? "suspended" : "active"
+            status: "active" // Extension always activates
         });
 
-        res.json({ message: `Trial extended by ${days} day(s)`, subscription });
+        res.json({ message: `Subscription extended by ${days} day(s)`, subscription });
     } catch (error) {
         res.status(500).json({ message: "Failed to extend trial" });
     }
@@ -453,17 +453,7 @@ router.post("/notifications/send", async (req, res) => {
             return res.status(400).json({ message: "audienceId required for institution/user audience types" });
         }
 
-        // Create master notification document
-        const notification = await Notification.create({
-            title,
-            message,
-            channel,
-            audienceType,
-            audienceId: audienceId ? new mongoose.Types.ObjectId(audienceId) : null,
-            sentBy: req.user._id,
-        });
-
-        // Determine recipients
+        // Determine recipients query
         let recipientQuery = {};
         switch (audienceType) {
             case "all_users":
@@ -481,6 +471,17 @@ router.post("/notifications/send", async (req, res) => {
         }
 
         const recipients = await User.find(recipientQuery).select("_id").lean();
+
+        // Create master notification document
+        const notification = await Notification.create({
+            title,
+            message,
+            channel,
+            audienceType,
+            audienceId: audienceId ? new mongoose.Types.ObjectId(audienceId) : null,
+            sentBy: req.user._id,
+            recipientCount: recipients.length, // Lovable Alignment: Persist count
+        });
 
         if (recipients.length === 0) {
             return res.json({

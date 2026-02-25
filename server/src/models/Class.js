@@ -6,7 +6,6 @@ const classSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Institution",
       required: true,
-      index: true,
     },
     name: { type: String, required: true },
     grade: { type: String, default: null },
@@ -26,6 +25,9 @@ const classSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// Compound index for mode-aware filtering
+classSchema.index({ institutionId: 1, modeType: 1 });
 
 classSchema.method("toJSON", function () {
   const { _id, __v, ...obj } = this.toObject();

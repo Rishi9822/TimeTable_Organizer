@@ -75,6 +75,9 @@ timetableSchema.index(
   }
 );
 
+// Compound index for mode-aware filtering
+timetableSchema.index({ institutionId: 1, modeType: 1 });
+
 timetableSchema.method("toJSON", function () {
   const { _id, __v, ...obj } = this.toObject();
   obj.id = _id;

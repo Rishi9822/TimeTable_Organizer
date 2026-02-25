@@ -1,6 +1,6 @@
-import React from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 import { Loader2 } from "lucide-react";
 
 export const ProtectedRoute = ({ children, requiredRoles }) => {
@@ -10,14 +10,25 @@ export const ProtectedRoute = ({ children, requiredRoles }) => {
     institutionId,
     isSetupComplete,
     emailVerified,
-    loading,
+    loading: authLoading,
     hasRole,
   } = useAuth();
+
+  const {
+    plan,
+    isTrialExpired,
+    activeMode,
+    schoolSetupComplete,
+    collegeSetupComplete,
+    loading: subLoading,
+  } = useSubscription();
 
   const location = useLocation();
   const currentPath = location.pathname;
 
-  // ⛔️ DO NOTHING until auth is fully resolved
+  const loading = authLoading || subLoading;
+
+  // ⛔️ DO NOTHING until both auth and subscription are resolved
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" role="status" aria-label="Loading">
@@ -26,24 +37,24 @@ export const ProtectedRoute = ({ children, requiredRoles }) => {
     );
   }
 
-  // ⛔️ WAIT until institutionId is known for admins
-  if (role === "admin" && user && institutionId === undefined) {
-    return null;
-  }
-
   // If user is not authenticated, redirect to auth page (except for public routes)
   if (!user && currentPath !== "/auth" && currentPath !== "/") {
     return <Navigate to="/auth" replace state={{ from: location }} />;
   }
 
+  // 1️⃣ SUBSCRIPTION ENFORCEMENT
+  // Block access if trial expired (unless on /upgrade or public routes)
+  if (user && isTrialExpired && currentPath !== "/upgrade" && role !== "super_admin") {
+    return <Navigate to="/upgrade" replace state={{ trialExpired: true }} />;
+  }
+
   // If user is authenticated and tries to access /auth, redirect to appropriate dashboard
-  // BUT: Allow unverified users to stay on /auth to see verification message
-  // This is for backward compatibility - existing users can still use the app
   if (user && currentPath === "/auth" && emailVerified) {
     if (role === "super_admin") {
       return <Navigate to="/super-admin" replace />;
     }
     if (role === "admin") {
+      // Flex logic: if they completed one mode but not both, they might still need setup
       if (!institutionId || !isSetupComplete) {
         return <Navigate to="/setup" replace />;
       }
@@ -79,14 +90,41 @@ export const ProtectedRoute = ({ children, requiredRoles }) => {
       return <Navigate to="/setup" replace />;
     }
 
-    // Institution exists but setup incomplete → force setup (only if verified)
-    if (emailVerified && institutionId && !isSetupComplete && currentPath !== "/setup") {
-      return <Navigate to="/setup" replace />;
-    }
+    // SaaS Logic: Handle setup completion gates for Flex vs Standard
+    if (emailVerified && institutionId) {
+      if (plan === "flex") {
+        const urlParams = new URLSearchParams(location.search);
+        const modeParam = urlParams.get("mode");
+        const needsSchool = !schoolSetupComplete;
+        const needsCollege = !collegeSetupComplete;
+        const needsAny = needsSchool || needsCollege;
 
-    // Setup complete → block setup page
-    if (institutionId && isSetupComplete && currentPath === "/setup") {
-      return <Navigate to="/admin" replace />;
+        // Allow access to /setup if specifically requesting a mode that isn't done
+        if (currentPath === "/setup") {
+          if (modeParam === "school" && !schoolSetupComplete) return children;
+          if (modeParam === "college" && !collegeSetupComplete) return children;
+
+          // If no specific mode param, but we need setup, check if we should allow or redirect to specific mode
+          if (needsAny) return children;
+
+          // If everything is done and they are on /setup, go to dashboard
+          return <Navigate to="/admin" replace />;
+        }
+
+        // Force setup if NOTHING is done
+        if (needsSchool && needsCollege && currentPath !== "/setup") {
+          return <Navigate to="/setup" replace />;
+        }
+      } else {
+        // Standard/Trial: Force setup if not complete
+        if (!isSetupComplete && currentPath !== "/setup") {
+          return <Navigate to="/setup" replace />;
+        }
+        // Block setup if already complete
+        if (isSetupComplete && currentPath === "/setup") {
+          return <Navigate to="/admin" replace />;
+        }
+      }
     }
   }
 

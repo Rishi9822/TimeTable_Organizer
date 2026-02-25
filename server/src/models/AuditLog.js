@@ -43,6 +43,12 @@ const auditLogSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.Mixed,
       default: {},
     },
+    // Flex plan: records the mode active when the action was performed
+    modeType: {
+      type: String,
+      enum: ["school", "college"],
+      default: null,
+    },
   },
   {
     timestamps: true,
@@ -54,6 +60,9 @@ auditLogSchema.index({ institutionId: 1, createdAt: -1 });
 
 // Index for filtering by action type
 auditLogSchema.index({ institutionId: 1, action: 1, createdAt: -1 });
+
+// Index for mode-specific filtering
+auditLogSchema.index({ institutionId: 1, modeType: 1, createdAt: -1 });
 
 auditLogSchema.method("toJSON", function () {
   const { _id, __v, ...obj } = this.toObject();

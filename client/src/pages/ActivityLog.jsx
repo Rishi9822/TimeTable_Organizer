@@ -22,6 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { DashboardLayout } from "@/components/DashboardLayout";
 
 /**
  * Format action for human-readable display
@@ -64,22 +65,18 @@ const formatDate = (dateString) => {
 };
 
 const ActivityLog = () => {
+  // ... (existing state/hooks)
   const { user, hasRole } = useAuth();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 50,
-    total: 0,
-    totalPages: 0,
+    page: 1, limit: 50, total: 0, totalPages: 0,
   });
 
   const fetchLogs = async (page = 1) => {
     try {
       setLoading(true);
-      const response = await API.get("/audit-logs", {
-        params: { page, limit: 50 },
-      });
+      const response = await API.get("/audit-logs", { params: { page, limit: 50 } });
       setLogs(response.data.logs || []);
       setPagination(response.data.pagination || pagination);
     } catch (error) {
@@ -90,148 +87,108 @@ const ActivityLog = () => {
   };
 
   useEffect(() => {
-    if (hasRole(["admin", "scheduler"])) {
-      fetchLogs();
-    }
+    if (hasRole(["admin", "scheduler"])) fetchLogs();
   }, []);
 
   if (!hasRole(["admin", "scheduler"])) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Card>
-          <CardContent className="py-8 text-center">
-            <p className="text-muted-foreground">
-              You don't have permission to view activity logs.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      <DashboardLayout title="Access Denied">
+        <div className="flex items-center justify-center py-12">
+          <Card>
+            <CardContent className="py-8 text-center">
+              <p className="text-muted-foreground">You don't have permission to view activity logs.</p>
+            </CardContent>
+          </Card>
+        </div>
+      </DashboardLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border/50">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-4">
-              <Link to={hasRole(["admin"]) ? "/admin" : "/builder"}>
-                <Button variant="ghost" size="sm" className="gap-2">
-                  <ArrowLeft className="w-4 h-4" />
-                  <span className="hidden sm:inline">Back</span>
-                </Button>
-              </Link>
-              <div className="h-6 w-px bg-border" />
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl gradient-primary flex items-center justify-center">
-                  <FileText className="h-5 w-5 text-primary-foreground" />
-                </div>
-                <div>
-                  <h1 className="text-lg font-semibold text-foreground">
-                    Activity Log
-                  </h1>
-                  <p className="text-xs text-muted-foreground">
-                    View all actions performed in your institution
-                  </p>
-                </div>
-              </div>
+    <DashboardLayout
+      title="Activity Log"
+      subtitle="Complete audit trail of all actions performed"
+    >
+      <Card>
+        <CardHeader>
+          <CardTitle>Activity Log</CardTitle>
+          <CardDescription>View all actions performed in your institution</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
-            <div className="flex items-center gap-2">
-              <NotificationBell />
-              <UserMenu />
+          ) : logs.length === 0 ? (
+            <div className="text-center py-12">
+              <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">No activity logs found.</p>
             </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Card>
-          <CardHeader>
-            <CardTitle>Activity Log</CardTitle>
-            <CardDescription>
-              Complete audit trail of all actions performed by admins and schedulers
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              </div>
-            ) : logs.length === 0 ? (
-              <div className="text-center py-12">
-                <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">No activity logs found.</p>
-              </div>
-            ) : (
-              <>
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Action</TableHead>
-                        <TableHead>Performed By</TableHead>
-                        <TableHead>Role</TableHead>
-                        <TableHead>Date & Time</TableHead>
+          ) : (
+            <>
+              <div className="rounded-md border text-xs sm:text-sm overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Action</TableHead>
+                      <TableHead>Performed By</TableHead>
+                      <TableHead className="hidden md:table-cell">Role</TableHead>
+                      <TableHead>Date & Time</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {logs.map((log) => (
+                      <TableRow key={log.id}>
+                        <TableCell className="font-medium whitespace-nowrap">
+                          {formatAction(log.action, log.meta || {})}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          {log.performedBy?.name || "Unknown"}
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          <Badge variant="secondary" className="capitalize text-[10px]">{log.role}</Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground whitespace-nowrap">
+                          {formatDate(log.createdAt)}
+                        </TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {logs.map((log) => (
-                        <TableRow key={log.id}>
-                          <TableCell className="font-medium">
-                            {formatAction(log.action, log.meta || {})}
-                          </TableCell>
-                          <TableCell>
-                            {log.performedBy?.name || "Unknown User"}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="secondary" className="capitalize">
-                              {log.role}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {formatDate(log.createdAt)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
 
-                {/* Pagination */}
-                {pagination.totalPages > 1 && (
-                  <div className="flex items-center justify-between mt-4">
-                    <p className="text-sm text-muted-foreground">
-                      Page {pagination.page} of {pagination.totalPages} (
-                      {pagination.total} total)
-                    </p>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => fetchLogs(pagination.page - 1)}
-                        disabled={pagination.page <= 1}
-                      >
-                        Previous
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => fetchLogs(pagination.page + 1)}
-                        disabled={pagination.page >= pagination.totalPages}
-                      >
-                        Next
-                      </Button>
-                    </div>
+              {pagination.totalPages > 1 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between mt-6 gap-4">
+                  <p className="text-sm text-muted-foreground">
+                    Page {pagination.page} of {pagination.totalPages}
+                  </p>
+                  <div className="flex gap-2 w-full sm:w-auto">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 sm:flex-none"
+                      onClick={() => fetchLogs(pagination.page - 1)}
+                      disabled={pagination.page <= 1}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 sm:flex-none"
+                      onClick={() => fetchLogs(pagination.page + 1)}
+                      disabled={pagination.page >= pagination.totalPages}
+                    >
+                      Next
+                    </Button>
                   </div>
-                )}
-              </>
-            )}
-          </CardContent>
-        </Card>
-      </main>
-    </div>
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </DashboardLayout>
   );
 };
 
