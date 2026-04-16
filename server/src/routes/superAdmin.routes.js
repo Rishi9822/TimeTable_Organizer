@@ -8,7 +8,7 @@ import Subscription from "../models/Subscription.js";
 import Notification from "../models/Notification.js";
 import UserNotification from "../models/UserNotification.js";
 
-const router = express.Router();
+const   router = express.Router();
 
 // ─── Apply auth + super admin guard to ALL routes in this file ───────────────
 router.use(authMiddleware, requireSuperAdmin);

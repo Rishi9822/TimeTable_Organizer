@@ -156,14 +156,24 @@ export const ProtectedRoute = ({ children, requiredRoles }) => {
     return <Navigate to="/join" replace />;
   }
 
-  // 5️⃣ TEACHER / STUDENT FLOW
-  // They are restricted to dashboard for now (unless accessing public routes)
+  // 5️⃣ TEACHER FLOW
   if (
-    (role === "teacher" || role === "student") &&
+    role === "teacher" &&
     currentPath !== "/dashboard" &&
+    currentPath !== "/teacher" &&
     currentPath !== "/"
   ) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/teacher" replace />;
+  }
+
+  // 6️⃣ STUDENT FLOW
+  if (
+    role === "student" &&
+    currentPath !== "/dashboard" &&
+    currentPath !== "/student" &&
+    currentPath !== "/"
+  ) {
+    return <Navigate to="/student" replace />;
   }
 
   // 6️⃣ All checks passed

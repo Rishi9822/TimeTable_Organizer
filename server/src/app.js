@@ -14,6 +14,13 @@ import auditLogRoutes from "./routes/auditLog.routes.js";
 import stripeRoutes from "./routes/stripe.routes.js";
 import superAdminRoutes from "./routes/superAdmin.routes.js";
 import notificationRoutes from "./routes/notification.routes.js";
+import studentRoutes from "./routes/student.routes.js";
+import attendanceRoutes from "./routes/attendance.routes.js";
+import leaveRequestRoutes from "./routes/leaveRequest.routes.js";
+import announcementRoutes from "./routes/announcement.routes.js";
+import academicCalendarRoutes from "./routes/academicCalendar.routes.js";
+import substitutionRoutes from "./routes/substitution.routes.js";
+import homeworkRoutes from "./routes/homework.routes.js";
 import checkSubscription from "./middleware/checkSubscription.js";
 
 
@@ -127,6 +134,13 @@ app.use("/api/classes", checkSubscription, classRoutes);
 app.use("/api", checkSubscription, assignmentRoutes);
 app.use("/api/timetables", checkSubscription, timetableRoutes);
 app.use("/api/audit-logs", checkSubscription, auditLogRoutes);
+app.use("/api/students", checkSubscription, studentRoutes);
+app.use("/api/attendance", checkSubscription, attendanceRoutes);
+app.use("/api/leave-requests", checkSubscription, leaveRequestRoutes);
+app.use("/api/announcements", checkSubscription, announcementRoutes);
+app.use("/api/academic-calendar", checkSubscription, academicCalendarRoutes);
+app.use("/api/substitutions", checkSubscription, substitutionRoutes);
+app.use("/api/homework", checkSubscription, homeworkRoutes);
 
 // ── Stripe routes (webhook already registered above) ──────────────────────────
 app.use("/api/stripe", stripeRoutes);

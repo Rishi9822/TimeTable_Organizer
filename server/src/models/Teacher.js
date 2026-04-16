@@ -20,6 +20,11 @@ const teacherSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
     department: {
       type: String,
       default: null,
