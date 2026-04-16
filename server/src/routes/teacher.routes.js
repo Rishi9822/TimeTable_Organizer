@@ -9,7 +9,23 @@ import {
   deleteTeacher,
 } from "../controllers/teacher.controller.js";
 
+import Teacher from "../models/Teacher.js";
+
 const router = express.Router();
+
+// Teacher self-lookup — any authenticated user can look up their own teacher profile
+router.get("/me", authMiddleware, async (req, res) => {
+  try {
+    const teacher = await Teacher.findOne({ userId: req.user._id });
+    if (!teacher) {
+      return res.status(404).json({ message: "Teacher profile not found" });
+    }
+    res.json(teacher);
+  } catch (err) {
+    console.error("[Teachers] /me error:", err);
+    res.status(500).json({ message: "Failed to fetch teacher profile" });
+  }
+});
 
 // All teacher routes require authentication and admin/scheduler role
 router.get(

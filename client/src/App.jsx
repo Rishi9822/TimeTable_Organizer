@@ -29,6 +29,9 @@ import EmailVerificationProcessing from "@/pages/EmailVerificationProcessing";
 import NotFound from "@/pages/NotFound";
 import ActivityLog from "@/pages/ActivityLog";
 import SuperAdminDashboard from "@/pages/SuperAdminDashboard";
+import TeacherDashboard from "@/pages/TeacherDashboard";
+import StudentDashboard from "@/pages/StudentDashboard";
+import Upgrade from "@/pages/Upgrade";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -142,6 +145,36 @@ const App = () => {
                         element={
                           <ProtectedRoute requiredRoles={["super_admin"]}>
                             <SuperAdminDashboard />
+                          </ProtectedRoute>
+                        }
+                      />
+
+                      {/* Teacher Dashboard */}
+                      <Route
+                        path="/teacher"
+                        element={
+                          <ProtectedRoute requiredRoles={["teacher"]}>
+                            <TeacherDashboard />
+                          </ProtectedRoute>
+                        }
+                      />
+
+                      {/* Student Dashboard */}
+                      <Route
+                        path="/student"
+                        element={
+                          <ProtectedRoute requiredRoles={["student"]}>
+                            <StudentDashboard />
+                          </ProtectedRoute>
+                        }
+                      />
+
+                      {/* Upgrade */}
+                      <Route
+                        path="/upgrade"
+                        element={
+                          <ProtectedRoute requiredRoles={["admin"]}>
+                            <Upgrade />
                           </ProtectedRoute>
                         }
                       />
