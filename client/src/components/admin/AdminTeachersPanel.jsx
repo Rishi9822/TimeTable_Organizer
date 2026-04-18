@@ -70,18 +70,18 @@ const AdminTeachersPanel = () => {
         if (createAccount && newTeacher.email) {
             setCreatingAccount(true);
             try {
-                // Use Express API to create teacher with linked user account
-                const { data: result } = await api.post('/teachers', {
-                    ...newTeacher,
-                    createAccount: true,
+                const { data: result } = await api.post('/teachers/create-account', {
+                    name: newTeacher.name,
+                    email: newTeacher.email,
+                    phone: newTeacher.phone || null,
+                    department: newTeacher.department || null,
+                    max_periods_per_day: newTeacher.max_periods_per_day || 6,
                 });
 
                 queryClient.invalidateQueries({ queryKey: ['teachers'] });
-                if (result.credentials) {
-                    setCreatedCredentials({ name: newTeacher.name, email: result.credentials.email, password: result.credentials.password });
-                    setCredentialsOpen(true);
-                }
+                setCreatedCredentials({ name: newTeacher.name, email: result.credentials.email, password: result.credentials.password });
                 setTeacherDialogOpen(false);
+                setCredentialsOpen(true);
                 setNewTeacher({ name: '', email: '', phone: '', department: '', max_periods_per_day: 6 });
                 toast({ title: 'Success', description: 'Teacher account created successfully' });
             } catch (error) {
@@ -136,6 +136,17 @@ const AdminTeachersPanel = () => {
         try {
             await assignTeacherClass.mutateAsync({ teacher_id: teacherId, subject_id: subjectId, class_id: classId, periods_per_week: 4 });
             toast({ title: 'Success', description: 'Teacher assigned to class' });
+        } catch (error) {
+            toast({ title: 'Error', description: error.response?.data?.message || error.message, variant: 'destructive' });
+        }
+    };
+
+    const handleResetPassword = async (teacher) => {
+        try {
+            const { data } = await api.post(`/teachers/${teacher.id}/reset-password`);
+            setCreatedCredentials({ name: teacher.name, email: teacher.email, password: data.password });
+            setCredentialsOpen(true);
+            toast({ title: 'Success', description: 'Password reset successfully' });
         } catch (error) {
             toast({ title: 'Error', description: error.response?.data?.message || error.message, variant: 'destructive' });
         }
@@ -332,7 +343,7 @@ const AdminTeachersPanel = () => {
                                         <div>
                                             <div className="flex items-center gap-2">
                                                 <CardTitle className="text-base">{teacher.name}</CardTitle>
-                                                {teacher.user_id ? (
+                                                {teacher.userId ? (
                                                     <Badge variant="default" className="text-[10px] px-1.5 py-0 h-4 gap-0.5">
                                                         <CheckCircle className="w-2.5 h-2.5" /> Account
                                                     </Badge>
@@ -372,6 +383,17 @@ const AdminTeachersPanel = () => {
                                     <div className="text-xs text-muted-foreground">
                                         {assignments.length} class assignments • Max {teacher.max_periods_per_day} periods/day
                                     </div>
+
+                                    {teacher.userId && (
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="w-full mt-2 text-xs gap-1.5"
+                                            onClick={() => handleResetPassword(teacher)}
+                                        >
+                                            <UserPlus className="w-3 h-3" />Reset Password
+                                        </Button>
+                                    )}
 
                                     <div className="flex gap-2 mt-2">
                                         <Dialog>

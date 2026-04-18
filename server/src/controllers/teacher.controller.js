@@ -55,14 +55,53 @@ export const createTeacher = async (req, res) => {
         });
       }
     }
+
+    const { createAccount, ...teacherData } = req.body;
+
     // CRITICAL: Force institutionId from authenticated user; Flex: set modeType for isolation
     const createPayload = {
-      ...req.body,
+      ...teacherData,
       institutionId: targetInstitutionId,
     };
     if (institution?.plan === "flex" && institution.activeMode) {
       createPayload.modeType = institution.activeMode;
     }
+
+    let credentials = null;
+
+    // If admin wants to create a login account for this teacher
+    if (createAccount && teacherData.email) {
+      const User = (await import("../models/User.js")).default;
+      const crypto = (await import("crypto")).default;
+
+      // Check if user already exists
+      const existingUser = await User.findOne({ email: teacherData.email });
+      if (existingUser) {
+        return res.status(400).json({ message: "A user with this email already exists" });
+      }
+
+      // Generate a secure password
+      const charset = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$";
+      const bytes = crypto.randomBytes(12);
+      let password = "";
+      for (let i = 0; i < 12; i++) {
+        password += charset[bytes[i] % charset.length];
+      }
+
+      // Create auth user
+      const user = await User.create({
+        name: teacherData.name,
+        email: teacherData.email,
+        password,
+        role: "teacher",
+        institutionId: targetInstitutionId,
+        emailVerified: true, // admin-created accounts are pre-verified
+      });
+
+      createPayload.userId = user._id;
+      credentials = { email: teacherData.email, password };
+    }
+
     const teacher = await Teacher.create(createPayload);
 
     // Audit log: Log AFTER successful creation
@@ -71,11 +110,17 @@ export const createTeacher = async (req, res) => {
       "CREATE_TEACHER",
       "teacher",
       teacher._id,
-      { teacherName: teacher.name }
+      { teacherName: teacher.name, accountCreated: !!credentials }
     ).catch(() => { }); // Silently ignore logging errors
 
-    res.status(201).json(teacher);
+    const response = { ...teacher.toJSON() };
+    if (credentials) {
+      response.credentials = credentials;
+    }
+
+    res.status(201).json(response);
   } catch (err) {
+    console.error("[Teachers] createTeacher error:", err);
     res.status(400).json({ message: err.message });
   }
 };
